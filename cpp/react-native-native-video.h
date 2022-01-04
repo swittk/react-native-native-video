@@ -13,6 +13,20 @@ class CallInvoker;
 }
 
 namespace SKRNNativeVideo {
+typedef struct SKRNSize {
+    double width;
+    double height;
+} SKRNSize;
+facebook::jsi::Object ObjectFromSKRNSize(facebook::jsi::Runtime &runtime, SKRNSize size);
+template <typename JSICompatibleType>
+facebook::jsi::Array ArrayFromJSICompatibleVector(facebook::jsi::Runtime &runtime, std::vector<JSICompatibleType> vec) {
+    facebook::jsi::Array arr(runtime, vec.size());
+    for(int i = 0; i < vec.size(); i++) {
+        arr.setValueAtIndex(runtime, i, facebook::jsi::Object::createFromHostObject(runtime, vec[i]));
+    }
+    return arr;
+}
+
 int multiply(float a, float b);
 
 void install(facebook::jsi::Runtime &jsiRuntime);
@@ -26,15 +40,20 @@ protected:
     // Be sure to set this to true in subclasses when video is loaded
     void setValid(bool v) {_valid = v;};
 public:
+    facebook::jsi::Runtime &runtime;
     bool isValid() { return _valid; };
     facebook::jsi::Value get(facebook::jsi::Runtime &runtime, const facebook::jsi::PropNameID &name);
     std::vector<facebook::jsi::PropNameID> getPropertyNames(facebook::jsi::Runtime& rt);
+    SKNativeFrameWrapper(facebook::jsi::Runtime &_runtime) : runtime(_runtime) {};
     
     // Make sure to implement these methods!
     /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
     virtual std::string platform() { return "null"; };
     // This should free/close native resources
     virtual void close() {};
+    // Supposed to return ArrayBuffer
+    virtual facebook::jsi::Value arrayBufferValue() { return facebook::jsi::Value::undefined(); }
+    virtual SKRNSize size() {return (SKRNSize){0, 0};}
 };
 
 class SKNativeVideoWrapper : public facebook::jsi::HostObject {
@@ -51,11 +70,13 @@ public:
     
     // Make sure to implement these methods!
     virtual void close() {};
-    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index) {return std::make_shared<SKNativeFrameWrapper>(); };
+    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index) {return std::make_shared<SKNativeFrameWrapper>(runtime); };
     virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(int index, int numFrames) {return std::vector<std::shared_ptr<SKNativeFrameWrapper>>{};};
-    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time) {return std::make_shared<SKNativeFrameWrapper>();};
+    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time) {return std::make_shared<SKNativeFrameWrapper>(runtime);};
     virtual int numFrames() {return 0;};
     virtual double frameRate() {return 0; };
+    virtual SKRNSize size() {return (SKRNSize){0, 0};}
+    virtual double duration() {return 0;}
 };
 }
 

@@ -6,8 +6,10 @@
 //
 
 #include "SKiOSNativeVideoCPP.h"
+#include "iOSVideoUtils.h"
 
 using namespace SKRNNativeVideo;
+using namespace facebook;
 #pragma mark - SKiOSNativeVideoWrapper
 static int clampInt(int val, int min, int max);
 static CMTime cmTimeFromValue(NSValue *value);
@@ -33,6 +35,8 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
          return;
      }
      videoTrack = videoTracks[0];
+     videoTrack.naturalSize;
+     videoTrack.preferredTransform;
      readerOutput = [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTrack outputSettings:nil];
      //
      readerOutput.supportsRandomAccess = YES;
@@ -74,7 +78,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
     CMTime cmTime = cmTimeFromValue(value);
     [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeMake(cmTime, kCMTimeZero)]]];
     CMSampleBufferRef buf = [readerOutput copyNextSampleBuffer];
-    std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(buf);
+    std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf);
     CFRelease(buf);
     return std::move(ret);
 }
@@ -91,7 +95,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     CMSampleBufferRef buf = [readerOutput copyNextSampleBuffer];
     std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret;
     while(buf != NULL) {
-        ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(buf));
+        ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf));
         CFRelease(buf);
         buf = [readerOutput copyNextSampleBuffer];
     }
@@ -100,6 +104,17 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
 
 double SKiOSNativeVideoWrapper::frameRate() {
     return videoTrack.nominalFrameRate;
+}
+
+SKRNSize SKiOSNativeVideoWrapper::size() {
+    AVAssetTrack *track = videoTrack;
+    CGSize size = CGSizeApplyAffineTransform(track.naturalSize, track.preferredTransform);
+    return (SKRNSize){ .width = size.width, .height = size.height };
+}
+
+double SKiOSNativeVideoWrapper::duration() {
+    CMTime val = videoTrack.asset.duration;
+    return (double)val.value / (double)val.timescale;
 }
 
 void SKiOSNativeVideoWrapper::close() {
@@ -116,11 +131,40 @@ void SKiOSNativeVideoWrapper::close() {
 
 #pragma mark - SKiOSNativeFrameWrapper
 
-SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(CMSampleBufferRef buf) {
+SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf) : SKNativeFrameWrapper(runtime) {
     CFRetain(buf);
     buffer = buf;
     setValid(true);
 }
+facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue() {
+//    jsi::ArrayBuffer
+    
+    Float32MallocatedPointerStruct ret = rawDataFromCMSampleBuffer(buffer);
+    if(ret.ptr == NULL) {
+        return facebook::jsi::Value::undefined();
+    }
+    // Create ArrayBuffer
+    jsi::Function arrayBufferCtor = runtime.global().getPropertyAsFunction(runtime, "ArrayBuffer");
+    size_t totalBytes = ret.len * sizeof(Float32);
+    jsi::Object o = arrayBufferCtor.callAsConstructor(runtime, jsi::Value((int)totalBytes)).getObject(runtime);
+    jsi::ArrayBuffer buf = o.getArrayBuffer(runtime);
+    memcpy(buf.data(runtime), ret.ptr, totalBytes);
+    free(ret.ptr);
+    return std::move(o);
+}
+
+SKRNSize SKiOSNativeFrameWrapper::size() {
+    if(!CMSampleBufferIsValid(buffer)) {
+        return (SKRNSize){0, 0};
+    }
+    CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(buffer);
+    CVPixelBufferLockBaseAddress(imageBuffer,0);
+    size_t width = CVPixelBufferGetWidth(imageBuffer);
+    size_t height = CVPixelBufferGetHeight(imageBuffer);
+    CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
+    return (SKRNSize){.width = (double)width, .height = (double)height};
+}
+
 void SKiOSNativeFrameWrapper::close() {
     if(buffer) {
         CMSampleBufferInvalidate(buffer);

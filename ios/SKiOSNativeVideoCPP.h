@@ -17,9 +17,15 @@ class SKiOSNativeFrameWrapper : public SKNativeFrameWrapper {
 public:
     CMSampleBufferRef buffer;
     /** This buffer is CFRetained +1 by the wrapper. You are supposed to call CFRelease() on any other dependencies on this buffer yourself.*/
-    SKiOSNativeFrameWrapper(CMSampleBufferRef buf);
+    SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf);
     ~SKiOSNativeFrameWrapper();
-    void close();
+    /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
+    virtual std::string platform() { return "iOS"; };
+    // This should free/close native resources
+    virtual void close();
+    // Supposed to return ArrayBuffer
+    virtual facebook::jsi::Value arrayBufferValue();
+    virtual SKRNSize size();
 };
 
 class SKiOSNativeVideoWrapper : public SKNativeVideoWrapper {
@@ -37,6 +43,8 @@ public:
     virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(int index, int numFrames);
     virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time);
     virtual double frameRate();
+    virtual SKRNSize size();
+    virtual double duration();
 };
 
 }
