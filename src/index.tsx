@@ -1,4 +1,5 @@
-import { NativeModules, Platform } from 'react-native';
+import React from 'react';
+import { NativeModules, Platform, requireNativeComponent, StyleProp, ViewStyle } from 'react-native';
 
 const LINKING_ERROR =
   `The package 'react-native-native-video' doesn't seem to be linked. Make sure: \n\n` +
@@ -9,36 +10,51 @@ const LINKING_ERROR =
 const NativeVideo = NativeModules.NativeVideo
   ? NativeModules.NativeVideo
   : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR);
-        },
-      }
-    );
+    {},
+    {
+      get() {
+        throw new Error(LINKING_ERROR);
+      },
+    }
+  );
 
 export function multiply(a: number, b: number): Promise<number> {
   return NativeVideo.multiply(a, b);
 }
 
-export function openVideo(url: string) : NativeVideoWrapper {
+export function openVideo(url: string): NativeVideoWrapper {
   return (global as any).SKRNNativeVideoOpenVideo(url);
 }
 
-interface NativeFrameWrapper {
-  arrayBuffer() : ArrayBuffer;
-  size(): {width: number, height: number};
+export interface NativeFrameWrapper {
+  arrayBuffer(): ArrayBuffer;
+  size: { width: number, height: number };
   isValid: boolean;
 }
 
-interface NativeVideoWrapper {
+export interface NativeVideoWrapper {
+  sourceUri: string;
   isValid: boolean;
   /** Duration in seconds */
   duration: number;
   numFrames: number;
   frameRate: number;
-  size: {width: number, height: number};
+  size: { width: number, height: number };
   getFrameAtIndex(idx: number): NativeFrameWrapper;
   getFramesAtIndex(idx: number, len: number): NativeFrameWrapper[];
   getFrameAtTime(time: number): NativeFrameWrapper;
+}
+
+const SKRNNativeFrameView = requireNativeComponent<NativeVideoFrameViewProps>('SKRNNativeFrameView');
+
+type NativeVideoFrameViewProps = { frameData?: NativeFrameWrapper, style?: StyleProp<ViewStyle> };
+type NativeVideoFrameViewState = {};
+export class NativeVideoFrameView extends React.PureComponent<NativeVideoFrameViewProps, NativeVideoFrameViewState> {
+  render() {
+    const { frameData, style } = this.props;
+    return <SKRNNativeFrameView
+      frameData={frameData}
+      style={style}
+    />
+  }
 }

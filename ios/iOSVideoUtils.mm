@@ -299,11 +299,14 @@ CVPixelBufferRef SKRN_convertPixelBufferToPixelFormat(CVPixelBufferRef input, OS
 Float32MallocatedPointerStruct rawDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
     CVImageBufferRef _imageBuffer = CMSampleBufferGetImageBuffer(buffer);
     if(CVPixelBufferIsPlanar(_imageBuffer)) {
+        NSLog(@"Unsupported planar buffers");
         // Planar buffers not supported
         return (Float32MallocatedPointerStruct){.ptr = NULL, .len = 0 };
     }
+    
     CVPixelBufferRef imageBuffer = SKRN_convertPixelBufferToPixelFormat(_imageBuffer, kCVPixelFormatType_32RGBA);
     if(imageBuffer == NULL) {
+        NSLog(@"Could not convert to 32RGBA");
         return (Float32MallocatedPointerStruct){.ptr = NULL, .len = 0 };
     }
     size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);

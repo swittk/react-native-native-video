@@ -4,6 +4,7 @@
 #include <string>
 #include <ReactCommon/CallInvoker.h>
 #include "CPPNumericStringHashCompare.h"
+#include <sstream>
 
 using namespace facebook;
 using namespace jsi;
@@ -30,7 +31,12 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
                                                                            {
 //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
                 int idx = arguments[0].asNumber();
-                return jsi::Object::createFromHostObject(runtime, getFrameAtIndex(idx));
+                auto res = getFrameAtIndex(idx);
+                if(res.get() == nullptr) {
+//                    return jsi::Value::undefined();
+                    throw jsi::JSError(runtime, "Failed to get frame");
+                }
+                return jsi::Object::createFromHostObject(runtime, res);
             });
         } break;
         case "getFramesAtIndex"_sh: {
@@ -50,7 +56,12 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
                                                                            {
 //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
                 double time = arguments[0].asNumber();
-                return jsi::Object::createFromHostObject(runtime, getFrameAtTime(time));
+                auto res = getFrameAtTime(time);
+                if(res.get() == nullptr) {
+//                    return jsi::Value::undefined();
+                    throw jsi::JSError(runtime, "Failed to get frame");
+                }
+                return jsi::Object::createFromHostObject(runtime, res);
             });
         } break;
         case "isValid"_sh: {
@@ -58,6 +69,9 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         } break;
         case "duration"_sh: {
             return jsi::Value(duration());
+        } break;
+        case "sourceUri"_sh: {
+            return jsi::String::createFromUtf8(runtime, sourceUri);
         } break;
         default:
             break;
@@ -72,7 +86,8 @@ static std::vector<std::string> nativeVideoWrapperKeys = {
     "getFramesAtIndex",
     "getFrameAtTime",
     "isValid",
-    "duration"
+    "duration",
+    "sourceUri"
 };
 
 std::vector<jsi::PropNameID> SKNativeVideoWrapper::getPropertyNames(jsi::Runtime& rt) {
@@ -88,19 +103,31 @@ static std::vector<std::string> nativeFrameWrapperKeys = {
     "arrayBuffer",
     "size",
     "isValid",
+    "nativePtrStr"
 };
 jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameID &name) {
     std::string methodName = name.utf8(runtime);
     long long methodSwitch = string_hash(methodName.c_str());
     switch(methodSwitch) {
         case "arrayBuffer"_sh: {
-            return arrayBufferValue();
+            return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
+                                                                               size_t count) -> jsi::Value
+                                                                           {
+//                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
+                return arrayBufferValue();
+            });
+
+//            printf("ArrayBuffer called with hash %llu when methodSwitch is %llu and method is %s", "arrayBuffer"_sh, methodSwitch, methodName.c_str());
         } break;
         case "size"_sh: {
             return ObjectFromSKRNSize(runtime, size());
         } break;
         case "isValid"_sh: {
             return jsi::Value(_valid);
+        } break;
+        case "nativePtrStr"_sh: {
+            std::string str = PointerToString(this);
+            return jsi::String::createFromUtf8(runtime, str);
         } break;
         default:
         break;
@@ -154,4 +181,19 @@ facebook::jsi::Object ObjectFromSKRNSize(facebook::jsi::Runtime &runtime, SKRNSi
     obj.setProperty(runtime, "height", size.height);
     return obj;
 }
+
+std::string PointerToString(void* cb)
+{
+    std::ostringstream oss;
+    oss << reinterpret_cast<uintptr_t>(cb);
+    return oss.str();
+}
+
+void* StringToPointer(std::string& str)
+{
+    std::istringstream iss(str);
+    uintptr_t ptr;
+    return (iss >> ptr) ? reinterpret_cast<void*>(ptr) : nullptr;
+}
+
 }

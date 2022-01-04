@@ -13,6 +13,9 @@ class CallInvoker;
 }
 
 namespace SKRNNativeVideo {
+std::string PointerToString(void* cb);
+void *StringToPointer(std::string& str);
+
 class SKNativeVideoWrapper;
 typedef struct SKRNSize {
     double width;

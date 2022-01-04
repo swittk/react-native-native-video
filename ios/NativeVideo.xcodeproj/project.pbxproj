@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		31476CD52783D2D7008AAF0A /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 31476CD42783D2D7008AAF0A /* AVFoundation.framework */; };
+		31476CE727849088008AAF0A /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 31476CE627849088008AAF0A /* GLKit.framework */; };
 		5E46D8CD2428F78900513E24 /* example.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5E46D8CB2428F78900513E24 /* example.cpp */; };
 		5E555C0D2413F4C50049A1A2 /* NativeVideo.mm in Sources */ = {isa = PBXBuildFile; fileRef = B3E7B5891CC2AC0600A0062D /* NativeVideo.mm */; };
 /* End PBXBuildFile section */
@@ -27,6 +28,7 @@
 /* Begin PBXFileReference section */
 		134814201AA4EA6300B7C361 /* libNativeVideo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libNativeVideo.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		31476CD42783D2D7008AAF0A /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk/System/Library/Frameworks/AVFoundation.framework; sourceTree = DEVELOPER_DIR; };
+		31476CE627849088008AAF0A /* GLKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLKit.framework; path = System/Library/Frameworks/GLKit.framework; sourceTree = SDKROOT; };
 		5E46D8CB2428F78900513E24 /* example.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = example.cpp; path = ../cpp/example.cpp; sourceTree = "<group>"; };
 		5E46D8CC2428F78900513E24 /* example.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = example.h; path = ../cpp/example.h; sourceTree = "<group>"; };
 		B3E7B5891CC2AC0600A0062D /* NativeVideo.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeVideo.mm; sourceTree = "<group>"; };
@@ -37,6 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				31476CE727849088008AAF0A /* GLKit.framework in Frameworks */,
 				31476CD52783D2D7008AAF0A /* AVFoundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -55,6 +58,7 @@
 		31476CD32783D2D7008AAF0A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				31476CE627849088008AAF0A /* GLKit.framework */,
 				31476CD42783D2D7008AAF0A /* AVFoundation.framework */,
 			);
 			name = Frameworks;

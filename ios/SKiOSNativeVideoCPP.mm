@@ -15,61 +15,97 @@ static int clampInt(int val, int min, int max);
 static CMTime cmTimeFromValue(NSValue *value);
 
 SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri) : SKNativeVideoWrapper(runtime, sourceUri)
- {
-     // See here https://developer.apple.com/forums/thread/42751 :: Resource for reading CMSampleBufferRef frames from video
-     NSString *path = [NSString stringWithUTF8String:sourceUri.c_str()];
-     if([path hasPrefix:@"file:///"]) {
-         path = [path substringFromIndex:7];
-     }
-
+{
+    // See here https://developer.apple.com/forums/thread/42751 :: Resource for reading CMSampleBufferRef frames from video
+    NSString *path = [NSString stringWithUTF8String:sourceUri.c_str()];
+    if([path hasPrefix:@"file:///"]) {
+        path = [path substringFromIndex:7];
+    }
+    
     asset = [AVAsset assetWithURL:[NSURL fileURLWithPath:path]];
-     NSError *assetReaderError;
-     reader = [AVAssetReader assetReaderWithAsset:asset error:&assetReaderError];
-     if(assetReaderError) {
-         _lastError = assetReaderError;
-         NSLog(@"Error reading asset, %@", _lastError);
-         return;
-     }
-     NSArray <AVAssetTrack *>*videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
-     if(![videoTracks count]) {
-         _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset does not have any video tracks"}];
-         NSLog(@"Found no video tracks %@");
-         return;
-     }
-     videoTrack = videoTracks[0];
-     videoTrack.naturalSize;
-     videoTrack.preferredTransform;
-     readerOutput = [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTrack outputSettings:nil];
-     //
-     readerOutput.supportsRandomAccess = YES;
-     [reader addOutput:readerOutput];
-     BOOL ok = [reader startReading];
-     if(!ok) {
-         _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset reader failed to read"}];
-         NSLog(@"Failed to read asset");
-         return;
-     }
-     // Funny little thing about sample cursors; they aren't that known lol
-     // Also doesn't work on iOS :(
-     // See https://developer.apple.com/forums/thread/119613
-//     if([videoTrack canProvideSampleCursors]) { }
-//     CMTimeScale timeScale = videoTrack.naturalTimeScale;
-//     videoTrack.nominalFrameRate;
-     int frameIndex = 0;
-     // Generate map of CMTime for people
-     NSMutableDictionary <NSNumber *, NSValue *>*frameTimeMapObj = [NSMutableDictionary new];
-     CMSampleBufferRef buffer = [readerOutput copyNextSampleBuffer];
-     while(buffer != NULL) {
+    
+    NSArray <AVAssetTrack *>*videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+    if(![videoTracks count]) {
+        _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset does not have any video tracks"}];
+        NSLog(@"Found no video tracks %@");
+        return;
+    }
+    videoTrack = videoTracks[0];
+    // Fast-read the asset to populate the timestamps for each frame
+    initialReadAsset();
+    
+    
+    NSError *assetReaderError;
+    reader = [AVAssetReader assetReaderWithAsset:asset error:&assetReaderError];
+    if(assetReaderError) {
+        _lastError = assetReaderError;
+        NSLog(@"Error reading asset, %@", _lastError);
+        return;
+    }
+    NSLog(@"created reader");
+    // Need to specify outputSettings, or CMSampleBufferGetImageBuffer will return NULL (since the frames are not decompressed)
+    @try {
+    readerOutput = [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTrack outputSettings:@{
+        (__bridge NSString *)kCVPixelBufferPixelFormatTypeKey:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+    }];
+    } @catch(NSError *e) {
+        NSLog(@"caught error with reading, %@", e);
+    }
+//    reader.timeRange = kCMTimeRangeZero;
+    // Make sure we support random access otherwise we won't be able to seek!
+    readerOutput.supportsRandomAccess = YES;
+    [reader addOutput:readerOutput];
+    reader.timeRange = CMTimeRangeMake(CMTimeMake(0, 10000), CMTimeMake(1, 10000));
+    BOOL ok = [reader startReading];
+    if(!ok) {
+        _lastError = reader.error;
+        NSLog(@"Failed to read asset, error %@", _lastError);
+        return;
+    }
+    // Make sure readerOutput reads till null so we can reset safely
+    while([readerOutput copyNextSampleBuffer] != NULL) {}
+}
+
+// This skims through the asset and get the frame time maps
+void SKiOSNativeVideoWrapper::initialReadAsset() {
+    NSError *assetReaderError;
+    AVAssetReader *fastReader = [AVAssetReader assetReaderWithAsset:asset error:&assetReaderError];
+    if(assetReaderError) {
+        _lastError = assetReaderError;
+        NSLog(@"Error reading asset, %@", _lastError);
+        return;
+    }
+    AVAssetReaderTrackOutput *fastOutput = [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTrack outputSettings:nil];
+    //
+    [fastReader addOutput:fastOutput];
+    BOOL ok = [fastReader startReading];
+    if(!ok) {
+        _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset reader failed to read"}];
+        NSLog(@"Failed to read asset");
+        return;
+    }
+    // Funny little thing about sample cursors; they aren't that known lol
+    // Also doesn't work on iOS :(
+    // See https://developer.apple.com/forums/thread/119613
+    //     if([videoTrack canProvideSampleCursors]) { }
+    //     CMTimeScale timeScale = videoTrack.naturalTimeScale;
+    //     videoTrack.nominalFrameRate;
+    int frameIndex = 0;
+    // Generate map of CMTime for people
+    NSMutableDictionary <NSNumber *, NSValue *>*frameTimeMapObj = [NSMutableDictionary new];
+    CMSampleBufferRef buffer = [fastOutput copyNextSampleBuffer];
+    while(buffer != NULL) {
         CMTime frameTime = CMSampleBufferGetOutputPresentationTimeStamp(buffer);
         [frameTimeMapObj setObject:[NSValue valueWithCMTime:frameTime] forKey:@(frameIndex)];
-         frameIndex++;
+        frameIndex++;
         // Next loop
-        buffer = [readerOutput copyNextSampleBuffer];
-     }
-     
-     frameTimeMap = frameTimeMapObj;
-     // Set the numFrames
-     _numFrames = frameIndex;
+        buffer = [fastOutput copyNextSampleBuffer];
+    }
+    frameTimeMap = frameTimeMapObj;
+    // Set the numFrames
+    _numFrames = frameIndex;
+    // This works fine
+//    NSLog(@"got numframes and frameTimeMap %d, %@", _numFrames, frameTimeMap);
 }
 
 std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtTime(double time) {
@@ -78,11 +114,24 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtTime(do
 }
 std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(int frameIdx) {
     NSValue *value = [frameTimeMap objectForKey:@(frameIdx)];
+//    NSLog(@"got value for frameIdx %d, value %@", frameIdx, value);
     CMTime cmTime = cmTimeFromValue(value);
-    [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeMake(cmTime, kCMTimeZero)]]];
+    [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeMake(cmTime, CMTimeMakeWithSeconds(1/frameRate(), videoTrack.naturalTimeScale))]]];
     CMSampleBufferRef buf = [readerOutput copyNextSampleBuffer];
+    if(buf == NULL) {
+        return std::shared_ptr<SKNativeFrameWrapper>(nullptr);
+    }
     std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf);
     CFRelease(buf);
+    
+    int extraCount = 0;
+    CMSampleBufferRef trash = [readerOutput copyNextSampleBuffer];
+    while(trash != NULL) {
+        CFRelease(trash);
+        extraCount++;
+        trash = [readerOutput copyNextSampleBuffer];
+    }
+//    NSLog(@"got frame at index %d with extraCount %d", frameIdx, extraCount);
     return std::move(ret);
 }
 
@@ -140,10 +189,10 @@ SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime
     setValid(true);
 }
 facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue() {
-//    jsi::ArrayBuffer
-    
+    //    jsi::ArrayBuffer
     Float32MallocatedPointerStruct ret = rawDataFromCMSampleBuffer(buffer);
     if(ret.ptr == NULL) {
+        NSLog(@"rawDataPtr is NULL");
         return facebook::jsi::Value::undefined();
     }
     // Create ArrayBuffer
@@ -158,6 +207,7 @@ facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue() {
 
 SKRNSize SKiOSNativeFrameWrapper::size() {
     if(!CMSampleBufferIsValid(buffer)) {
+        NSLog(@"Sample buffer is invalid");
         return (SKRNSize){0, 0};
     }
     CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(buffer);
@@ -165,6 +215,7 @@ SKRNSize SKiOSNativeFrameWrapper::size() {
     size_t width = CVPixelBufferGetWidth(imageBuffer);
     size_t height = CVPixelBufferGetHeight(imageBuffer);
     CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
+//    NSLog(@"Got frame size %zu, %zu", width, height);
     return (SKRNSize){.width = (double)width, .height = (double)height};
 }
 

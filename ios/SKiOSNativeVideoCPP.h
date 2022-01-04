@@ -46,8 +46,10 @@ public:
     virtual double frameRate();
     virtual SKRNSize size();
     virtual double duration();
+private:
+    void initialReadAsset();
 };
 
-}
+};
 
 #endif /* SKiOSNativeVideoCPP_hpp */
