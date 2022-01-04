@@ -123,19 +123,20 @@ int multiply(float a, float b) {
 
 // Hopefully I won't need the invoker this time...
 //void install(facebook::jsi::Runtime &jsiRuntime, std::shared_ptr<facebook::react::CallInvoker> invoker) {
-void install(facebook::jsi::Runtime &jsiRuntime) {
+void install(facebook::jsi::Runtime &jsiRuntime, std::function<std::shared_ptr<SKNativeVideoWrapper>(jsi::Runtime&, std::string)> videoConstructor) {
     auto openVideoFunction =
     jsi::Function::createFromHostFunction(
                                           jsiRuntime,
                                           PropNameID::forAscii(jsiRuntime, "SKRNNativeVideoOpenVideo"),
                                           0,
 //                                          [&, invoker](Runtime &runtime, const Value &thisValue, const Value *arguments,
-                                          [&](Runtime &runtime, const Value &thisValue, const Value *arguments,
+                                          [&, videoConstructor](Runtime &runtime, const Value &thisValue, const Value *arguments,
                                                        size_t count) -> Value
                                           {
                                               if(count < 1) return jsi::Value::undefined();
                                               std::string path = arguments[0].asString(runtime).utf8(runtime);
-                                              auto obj = std::make_shared<SKNativeVideoWrapper>(runtime, path);
+                                              std::shared_ptr<SKNativeVideoWrapper> obj = videoConstructor(runtime, path);
+//                                              auto obj = std::make_shared<SKNativeVideoWrapper>(runtime, path);
                                               jsi::Object object = jsi::Object::createFromHostObject(runtime, obj);
                                               return object;
                                           });

@@ -42,6 +42,7 @@ public:
     virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index);
     virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(int index, int numFrames);
     virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time);
+    virtual int numFrames() {return _numFrames;};
     virtual double frameRate();
     virtual SKRNSize size();
     virtual double duration();

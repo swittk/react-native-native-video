@@ -4,6 +4,7 @@
 #import <React/RCTBridge+Private.h>
 #import <jsi/jsi.h>
 #import <ReactCommon/CallInvoker.h>
+#import "SKiOSNativeVideoCPP.h"
 
 using namespace SKRNNativeVideo;
 
@@ -64,7 +65,10 @@ RCT_EXPORT_METHOD(multiply:(nonnull NSNumber*)a withB:(nonnull NSNumber*)b
         return;
     }
     facebook::jsi::Runtime *runtime = (facebook::jsi::Runtime *)cxxBridge.runtime;
-    install(*runtime);
+    install(*runtime, [](facebook::jsi::Runtime& runtime, std::string path) -> std::shared_ptr<SKNativeVideoWrapper> {
+        std::shared_ptr<SKNativeVideoWrapper>ret =  std::make_shared<SKiOSNativeVideoWrapper>(runtime, path);
+        return ret;
+    });
 }
 
 - (void)invalidate {

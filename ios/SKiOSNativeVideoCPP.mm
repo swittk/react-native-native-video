@@ -27,11 +27,13 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
      reader = [AVAssetReader assetReaderWithAsset:asset error:&assetReaderError];
      if(assetReaderError) {
          _lastError = assetReaderError;
+         NSLog(@"Error reading asset, %@", _lastError);
          return;
      }
      NSArray <AVAssetTrack *>*videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
      if(![videoTracks count]) {
          _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset does not have any video tracks"}];
+         NSLog(@"Found no video tracks %@");
          return;
      }
      videoTrack = videoTracks[0];
@@ -44,6 +46,7 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
      BOOL ok = [reader startReading];
      if(!ok) {
          _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset reader failed to read"}];
+         NSLog(@"Failed to read asset");
          return;
      }
      // Funny little thing about sample cursors; they aren't that known lol

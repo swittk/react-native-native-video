@@ -13,6 +13,7 @@ class CallInvoker;
 }
 
 namespace SKRNNativeVideo {
+class SKNativeVideoWrapper;
 typedef struct SKRNSize {
     double width;
     double height;
@@ -29,7 +30,7 @@ facebook::jsi::Array ArrayFromJSICompatibleVector(facebook::jsi::Runtime &runtim
 
 int multiply(float a, float b);
 
-void install(facebook::jsi::Runtime &jsiRuntime);
+void install(facebook::jsi::Runtime &jsiRuntime, std::function<std::shared_ptr<SKNativeVideoWrapper>(facebook::jsi::Runtime&, std::string)> videoConstructor);
 //void install(facebook::jsi::Runtime &jsiRuntime, std::shared_ptr<facebook::react::CallInvoker> invoker);
 void cleanup(facebook::jsi::Runtime &jsiRuntime);
 
