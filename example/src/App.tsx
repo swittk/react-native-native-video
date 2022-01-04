@@ -2,11 +2,10 @@ import * as React from 'react';
 import * as ImagePicker from 'expo-image-picker';
 
 import { StyleSheet, View, Text, Button, Alert, TextInput } from 'react-native';
-import { multiply, openVideo, NativeVideoWrapper, NativeVideoFrameView, NativeFrameWrapper } from 'react-native-native-video';
+import { openVideo, NativeVideoWrapper, NativeVideoFrameView, NativeFrameWrapper } from 'react-native-native-video';
 import Slider from '@react-native-community/slider';
 
 export default function App() {
-  const [result, setResult] = React.useState<number | undefined>();
   const [pickedUri, setPickedUri] = React.useState<string>();
   const [frameIdx, setFrameIdx] = React.useState(0);
   const [frame, setFrame] = React.useState<NativeFrameWrapper>();
@@ -47,31 +46,25 @@ export default function App() {
     setFrame(frame);
   }
 
-
-  React.useEffect(() => {
-    multiply(3, 7).then(setResult);
-  }, []);
-
   const recentAnimFrame = React.useRef<ReturnType<typeof requestAnimationFrame>>();
-  const safeSetViewFrameIndex = React.useCallback((idx: number)=>{
-    if(recentAnimFrame.current) {
+  const safeSetViewFrameIndex = React.useCallback((idx: number) => {
+    if (recentAnimFrame.current) {
       cancelAnimationFrame(recentAnimFrame.current);
     }
-    const me = requestAnimationFrame(()=>{
+    const me = requestAnimationFrame(() => {
       const vid = vidRef.current;
-      if(!vid) return;
+      if (!vid) return;
       const frame = vid.getFrameAtIndex(Math.floor(idx));
       setFrame(frame);
-      if(recentAnimFrame.current == me) {
+      if (recentAnimFrame.current == me) {
         recentAnimFrame.current = undefined;
       }
     });
     recentAnimFrame.current = me;
-  },[]);
+  }, []);
 
   return (
     <View style={styles.container}>
-      <Text>Result: {result}</Text>
       <Button title='Pick Video' onPress={onPickVideo} />
       <TextInput style={{ fontSize: 16, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#888' }} value={goToFrame} onChangeText={setGoToFrame} onEndEditing={() => {
         let num = Number(goToFrame);
@@ -81,22 +74,22 @@ export default function App() {
         }
         setFrameIdx(num);
       }} />
-      <Slider 
+      <Slider
         minimumValue={0}
         maximumValue={numFrames - 1}
         minimumTrackTintColor="#FFFFFF"
-        maximumTrackTintColor="#000000"    
-        onValueChange={(v)=>{
+        maximumTrackTintColor="#000000"
+        onValueChange={(v) => {
           const vid = vidRef.current;
-          if(!vid) return;
+          if (!vid) return;
           safeSetViewFrameIndex(Math.floor(v));
-        }}  
+        }}
       />
       <Text>Video uri: {pickedUri}</Text>
       <Button title='Get video properties' onPress={onVideoProperties} />
       <Button title='Test Frame getting' onPress={onVideoFrameTest} />
       <NativeVideoFrameView
-        style={{ backgroundColor: 'red', borderWidth: 1, borderRadius: 8, flex: 1, alignSelf: 'stretch' }}
+        style={{ backgroundColor: 'blue', borderWidth: 1, borderRadius: 8, flex: 1, alignSelf: 'stretch' }}
         frameData={frame}
       />
     </View>
