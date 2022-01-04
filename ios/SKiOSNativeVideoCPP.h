@@ -13,11 +13,16 @@
 #define SKiOSNativeVideoCPP_hpp
 
 namespace SKRNNativeVideo {
+double SKRNNVCGAffineTransformGetRotation(CGAffineTransform transform);
+UIImageOrientation SKRNNVRotationValueToUIImageOrientation(double rotation);
+
 class SKiOSNativeFrameWrapper : public SKNativeFrameWrapper {
 public:
     CMSampleBufferRef buffer;
+    CGAffineTransform transform;
+    UIImageOrientation orientation;
     /** This buffer is CFRetained +1 by the wrapper. You are supposed to call CFRelease() on any other dependencies on this buffer yourself.*/
-    SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf);
+    SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf, CGAffineTransform transform, UIImageOrientation orientation);
     ~SKiOSNativeFrameWrapper();
     /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
     virtual std::string platform() { return "iOS"; };
@@ -31,6 +36,7 @@ public:
 class SKiOSNativeVideoWrapper : public SKNativeVideoWrapper {
     int _numFrames;
     NSDictionary <NSNumber *, NSValue *>*frameTimeMap;
+    UIImageOrientation orientation = UIImageOrientationUp;
 public:
     NSError *_lastError;
     AVAsset *asset;

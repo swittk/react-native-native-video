@@ -11,6 +11,8 @@
 @interface SKRNNativeFrameView : UIView
 @property (readonly) UIImage *image;
 -(void)showDisplayBuffer:(CMSampleBufferRef)buffer;
+-(void)showDisplayBuffer:(CMSampleBufferRef)buffer transform:(CGAffineTransform)transform;
+-(void)showDisplayBuffer:(CMSampleBufferRef)buffer orientation:(UIImageOrientation)orientation;
 @end
 
 @interface SKRNNativeFrameViewManager : RCTViewManager

@@ -27,7 +27,7 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
     NSArray <AVAssetTrack *>*videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
     if(![videoTracks count]) {
         _lastError = [NSError errorWithDomain:@"SKNativeVideo" code:404 userInfo:@{NSLocalizedDescriptionKey:@"The asset does not have any video tracks"}];
-        NSLog(@"Found no video tracks %@");
+        NSLog(@"Found no video tracks");
         return;
     }
     videoTrack = videoTracks[0];
@@ -68,6 +68,8 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
 
 // This skims through the asset and get the frame time maps
 void SKiOSNativeVideoWrapper::initialReadAsset() {
+    double rotation = SKRNNVCGAffineTransformGetRotation(videoTrack.preferredTransform);
+    orientation = SKRNNVRotationValueToUIImageOrientation(rotation);
     NSError *assetReaderError;
     AVAssetReader *fastReader = [AVAssetReader assetReaderWithAsset:asset error:&assetReaderError];
     if(assetReaderError) {
@@ -121,7 +123,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
     if(buf == NULL) {
         return std::shared_ptr<SKNativeFrameWrapper>(nullptr);
     }
-    std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf);
+    std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation);
     CFRelease(buf);
     
     int extraCount = 0;
@@ -147,7 +149,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     CMSampleBufferRef buf = [readerOutput copyNextSampleBuffer];
     std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret;
     while(buf != NULL) {
-        ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf));
+        ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation));
         CFRelease(buf);
         buf = [readerOutput copyNextSampleBuffer];
     }
@@ -183,7 +185,7 @@ void SKiOSNativeVideoWrapper::close() {
 
 #pragma mark - SKiOSNativeFrameWrapper
 
-SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf) : SKNativeFrameWrapper(runtime) {
+SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf, CGAffineTransform vtransform, UIImageOrientation vorientation) : SKNativeFrameWrapper(runtime), transform(vtransform), orientation(vorientation) {
     CFRetain(buf);
     buffer = buf;
     setValid(true);
@@ -244,3 +246,39 @@ CMTime cmTimeFromValue(NSValue *value) {
     return CMTimeMake(0, 0);
 }
 
+double SKRNNativeVideo::SKRNNVCGAffineTransformGetRotation(CGAffineTransform transform) {
+    return atan2(transform.b, transform.a);
+}
+
+UIImageOrientation SKRNNativeVideo::SKRNNVRotationValueToUIImageOrientation(double rotation) {
+    // UIImageRotations are clockwise
+    if(rotation >= 0) {
+        switch((int)(rotation/M_PI_4)) {
+            default:
+            case 0: return UIImageOrientationUp; // 0-45°
+            case 1: // 45-90°
+            case 2: return UIImageOrientationRight; // 90-135°
+            case 3: // 135-180°
+            case 4: return UIImageOrientationDown; // 180-225°
+            case 5: // 225-270°
+            case 6: return UIImageOrientationLeft; // 270-315°
+            case 7: // 270-315°
+            case 8: return UIImageOrientationUp; // 315-360°
+        }
+    }
+    else {
+        // Rotation < 0
+        switch((int)(-rotation/M_PI_4)) {
+            default:
+            case 0: return UIImageOrientationUp; // 0-45°
+            case 1: // 45-90°
+            case 2: return UIImageOrientationLeft; // 90-135°
+            case 3: // 135-180°
+            case 4: return UIImageOrientationDown; // 180-225°
+            case 5: // 225-270°
+            case 6: return UIImageOrientationRight; // 270-315°
+            case 7: // 270-315°
+            case 8: return UIImageOrientationUp; // 315-360°
+        }
+    }
+}

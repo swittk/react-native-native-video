@@ -32,7 +32,7 @@ RCT_CUSTOM_VIEW_PROPERTY(frameData, id, SKRNNativeFrameView) {
             return;
         }
         SKiOSNativeFrameWrapper *wrapper = (SKiOSNativeFrameWrapper *)ptr;
-        [view showDisplayBuffer:wrapper->buffer];
+        [view showDisplayBuffer:wrapper->buffer orientation:wrapper->orientation];
     }
 }
 
@@ -71,6 +71,27 @@ RCT_EXPORT_METHOD(setFrameData:(id)data) {
 //    size_t width = CVPixelBufferGetWidth(buf);
 //    size_t height = CVPixelBufferGetHeight(buf);
     UIImage *uiImage = [UIImage imageWithCIImage:image];
+    self.image = uiImage;
+    CFRelease(buf);
+}
+-(void)showDisplayBuffer:(CMSampleBufferRef)buffer transform:(CGAffineTransform)transform {
+    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
+    CFRetain(buf);
+    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
+    image = [image imageByApplyingTransform:transform];
+//    size_t width = CVPixelBufferGetWidth(buf);
+//    size_t height = CVPixelBufferGetHeight(buf);
+    UIImage *uiImage = [UIImage imageWithCIImage:image];
+    self.image = uiImage;
+    CFRelease(buf);
+}
+-(void)showDisplayBuffer:(CMSampleBufferRef)buffer orientation:(UIImageOrientation)orientation {
+    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
+    CFRetain(buf);
+    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
+//    size_t width = CVPixelBufferGetWidth(buf);
+//    size_t height = CVPixelBufferGetHeight(buf);
+    UIImage *uiImage = [UIImage imageWithCIImage:image scale:1.0 orientation:orientation];
     self.image = uiImage;
     CFRelease(buf);
 }
