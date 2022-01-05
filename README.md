@@ -2,7 +2,9 @@
 
 Native Video Access for React Native
 
-Currently iOS only. Android version coming when my project finally needs Android support or when I finally have more time (or more money lol).
+Working for iOS and Android!
+
+Android support is second class, however, unless I finally have more time (or more money lol).
 
 ## Installation
 
