@@ -89,7 +89,7 @@ export default function App() {
       <Button title='Get video properties' onPress={onVideoProperties} />
       <Button title='Test Frame getting' onPress={onVideoFrameTest} />
       <NativeVideoFrameView
-        style={{ backgroundColor: 'blue', borderWidth: 1, borderRadius: 8, flex: 1, alignSelf: 'stretch' }}
+        style={{ backgroundColor: 'green', borderWidth: 1, borderRadius: 8, flex: 1, alignSelf: 'stretch' }}
         frameData={frame}
       />
     </View>

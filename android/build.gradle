@@ -7,7 +7,7 @@ buildscript {
         }
 
         dependencies {
-            classpath 'com.android.tools.build:gradle:3.5.3'
+          classpath 'com.android.tools.build:gradle:4.2.0'
         }
     }
 }
@@ -36,9 +36,9 @@ android {
     }
 
     externalNativeBuild {
-        cmake {
-            path "CMakeLists.txt"
-        }
+      cmake {
+        path "CMakeLists.txt"
+      }
     }
 
     buildTypes {
@@ -53,6 +53,7 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+  ndkVersion "23.1.7779620"
 }
 
 repositories {

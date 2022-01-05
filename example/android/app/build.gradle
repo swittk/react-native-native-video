@@ -150,6 +150,7 @@ android {
             keyPassword 'android'
         }
     }
+    ndkVersion "23.1.7779620"
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
