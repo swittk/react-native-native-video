@@ -6,6 +6,7 @@
 #import <jni.h>
 #ifndef ANDROID_SKANDROIDNATIVEVIDEOCPP_H
 #define ANDROID_SKANDROIDNATIVEVIDEOCPP_H
+
 namespace SKRNNativeVideo {
     class SKAndroidNativeFrameWrapper : public SKNativeFrameWrapper {
     public:
@@ -38,20 +39,6 @@ namespace SKRNNativeVideo {
     class SKAndroidNativeVideoWrapper : public SKNativeVideoWrapper {
     private:
 //        jclass NativeVideoWrapperJavaSideClass;
-        jmethodID NativeVideoWrapperJavaGetFrameAtIndexMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetFramesAtIndexMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetFrameAtTimeMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetNumFramesMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetFrameRateMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetDurationMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
-        jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
-
-        jclass java_util_List;
-        jmethodID java_util_List_;
-        jmethodID java_util_List_size;
-        jmethodID java_util_List_get;
-        jmethodID java_util_List_add;
         void initListHelper(JNIEnv *env);
         std::vector<jobject> javaList2vector_jobjects(JNIEnv *env, jobject javaList);
     public:
@@ -97,6 +84,7 @@ extern "C"
 JNIEXPORT jobject JNICALL
 Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_getBitmapFromStringAddressOfFrameWrapper(
                                                                                                     JNIEnv *env, jclass clazz, jstring address);
-
+extern "C"
+jint JNI_OnLoad(JavaVM *vm, void *reserved);
 
 #endif //ANDROID_SKANDROIDNATIVEVIDEOCPP_H

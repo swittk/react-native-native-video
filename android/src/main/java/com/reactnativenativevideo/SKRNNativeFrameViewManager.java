@@ -21,14 +21,16 @@ public class SKRNNativeFrameViewManager extends SimpleViewManager<ReactImageView
     mCallerContext = reactContext;
   }
 
-  @ReactProp(name = "frame")
-  public void setFrame(ReactImageView view, ReadableMap arg) {
+  @ReactProp(name = "frameData")
+  public void setFrameData(ReactImageView view, ReadableMap arg) {
+    Log.d("SKRN", "SetFrame Called");
     String ptrStr = arg.getString("nativePtrStr");
     Bitmap bitmap = getBitmapFromStringAddressOfFrameWrapper(ptrStr);
     if(bitmap == null) {
       Log.d("SKRN", "bitmap null");
       return;
     }
+    Log.d("SKRN", "Did set image bitmap "+bitmap);
     view.setImageBitmap(bitmap);
 //    arg.getString("nativePtrStr");
 //    view.setImageBitmap();

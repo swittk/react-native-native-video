@@ -53,19 +53,24 @@ public class SKNativeVideoWrapperJavaSide {
     if(numFrames != 0) {
       return numFrames;
     }
-    numFrames = Integer.parseInt(mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_VIDEO_FRAME_COUNT));
+    String fcStr = mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_VIDEO_FRAME_COUNT);
+    if(fcStr == null || fcStr.isEmpty()) {
+      return 0;
+    }
+    numFrames = Integer.parseInt(fcStr);
     Log.d("NumFrames", "NumFrames" + numFrames);
     return numFrames;
   }
 
   double getFrameRate() {
     if(FPS != 0) { return FPS; }
-    double capFrameRate = Double.parseDouble(mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_CAPTURE_FRAMERATE));
-    if(capFrameRate == 0) {
+
+    String capFrameRateString = mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_CAPTURE_FRAMERATE);
+    if(capFrameRateString == null) {
       FPS = (double)(getNumFrames())/getDuration();
     }
     else {
-      FPS = capFrameRate;
+      FPS = Double.parseDouble(capFrameRateString);
     }
     Log.d("SKRN", "FPS" + FPS);
     return FPS;
@@ -84,13 +89,19 @@ public class SKNativeVideoWrapperJavaSide {
   }
   int getWidth() {
     if(width != 0) {return width;}
-    width = Integer.parseInt(mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_VIDEO_WIDTH));
+    String wStr = mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_VIDEO_WIDTH);
+    if(wStr == null || wStr.isEmpty()) {
+      return 0;
+    }
+    width = Integer.parseInt(wStr);
     Log.d("SKRN", "width" + width);
     return width;
   }
   int getHeight() {
     if(height != 0) {return height;}
-    height = Integer.parseInt(mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_VIDEO_HEIGHT));
+    String hStr = mediaRetriever.extractMetadata(mediaRetriever.METADATA_KEY_VIDEO_HEIGHT);
+    if(hStr == null || hStr.isEmpty()) {return 0;}
+    height = Integer.parseInt(hStr);
     Log.d("SKRN", "height" + height);
     return height;
   }

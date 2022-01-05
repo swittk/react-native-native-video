@@ -12,6 +12,28 @@
 
 #include "SKAndroidNativeVideoCPP.h"
 #include <jni.h>
+
+jclass NativeVideoWrapperJavaSideClass = 0;
+jmethodID NativeVideoWrapperJavaGetFrameAtIndexMethod = 0;
+jmethodID NativeVideoWrapperJavaGetFramesAtIndexMethod = 0;
+jmethodID NativeVideoWrapperJavaGetFrameAtTimeMethod = 0;
+jmethodID NativeVideoWrapperJavaGetNumFramesMethod = 0;
+jmethodID NativeVideoWrapperJavaGetFrameRateMethod = 0;
+jmethodID NativeVideoWrapperJavaGetDurationMethod = 0;
+jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
+jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
+jmethodID NativeVideoWrapperJavaSideClassConstructor = 0;
+
+jmethodID BitmapGetWidthMethod = 0;
+jmethodID BitmapGetHeightMethod = 0;
+jclass BitmapClassRef = 0;
+
+jclass java_util_List;
+jmethodID java_util_List_;
+jmethodID java_util_List_size;
+jmethodID java_util_List_get;
+jmethodID java_util_List_add;
+
 using namespace SKRNNativeVideo;
 
 static std::string jstring2string(JNIEnv *env, jstring jStr);
@@ -27,15 +49,11 @@ SKAndroidNativeVideoWrapper::SKAndroidNativeVideoWrapper(
     JNIEnv *env = getJNIEnv();
     initListHelper(env);
     printf("got jnienv %d", env);
-    jclass NativeVideoWrapperJavaSideClass = env->FindClass(
-            "com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
     printf("found class");
-    jmethodID constructorMethod = env->GetMethodID(NativeVideoWrapperJavaSideClass, "<init>",
-                                                                   "(Ljava/lang/String;)V");
     printf("got constructor");
     // The MediaMetadataRetriever wrapper object
     jstring stringUri = env->NewStringUTF(sourceUri.c_str());
-    jobject obj = env->NewObject(NativeVideoWrapperJavaSideClass, constructorMethod, stringUri);
+    jobject obj = env->NewObject(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideClassConstructor, stringUri);
     printf("got jobj");
     javaVideoWrapper = env->NewGlobalRef(obj);
     printf("got javavideowrapper");
@@ -56,13 +74,6 @@ std::shared_ptr<SKNativeFrameWrapper>
 SKAndroidNativeVideoWrapper::getFrameAtIndex(int index) {
     JNIEnv *env = getJNIEnv();
     // According to https://stackoverflow.com/a/2093300/4469172, I should not reuse jclass, but `jmethodID`s are reusable.
-    jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-    if(!NativeVideoWrapperJavaGetFrameAtIndexMethod) {
-        NativeVideoWrapperJavaGetFrameAtIndexMethod = env->GetMethodID(MyClass, "getFrameAtIndex",
-                                                                       "(I)Landroid/graphics/Bitmap;");
-    }
-//    jmethodID meth = env->GetMethodID(MyClass, "getFrameAtIndex",
-//                                      "(I)Landroid/graphics/Bitmap;");
     jobject bitmap = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameAtIndexMethod, index);
     clearJNIEnv();
     return std::make_shared<SKAndroidNativeFrameWrapper>(runtime, jvm, bitmap);
@@ -74,14 +85,7 @@ SKAndroidNativeVideoWrapper::getFramesAtIndex(int index, int len) {
     std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret = std::vector<std::shared_ptr<SKNativeFrameWrapper>>();
     // According to https://stackoverflow.com/a/2093300/4469172, I should not reuse jclass, but `jmethodID`s are
     // reusable.
-    jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-    if(!NativeVideoWrapperJavaGetFramesAtIndexMethod) {
-        NativeVideoWrapperJavaGetFramesAtIndexMethod = env->GetMethodID(MyClass, "getFramesAtIndex",
-                                                                       "(II)Ljava/util/List;");
-    }
-    jmethodID  meth = env->GetMethodID(MyClass, "getFramesAtIndex",
-                                                                    "(II)Ljava/util/List;");
-    jobject listObj = env->CallObjectMethod(javaVideoWrapper, meth, index, len);
+    jobject listObj = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFramesAtIndexMethod, index, len);
     std::vector<jobject> bitmaps = javaList2vector_jobjects(env, listObj);
     for(jobject bitmap : bitmaps) {
         ret.push_back(std::make_shared<SKAndroidNativeFrameWrapper>(runtime, jvm, bitmap));
@@ -92,24 +96,12 @@ SKAndroidNativeVideoWrapper::getFramesAtIndex(int index, int len) {
 std::shared_ptr<SKNativeFrameWrapper>
 SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
     JNIEnv *env = getJNIEnv();
-    jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-    if(!NativeVideoWrapperJavaGetFrameAtTimeMethod) {
-        NativeVideoWrapperJavaGetFrameAtTimeMethod = env->GetMethodID(MyClass, "getFrameAtTime",
-                                                                       "(D)Landroid/graphics/Bitmap;");
-    }
-//    jmethodID meth = env->GetMethodID(MyClass, "getFrameAtTime",
-//                                      "(D)Landroid/graphics/Bitmap;");
     jobject bitmap = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameAtTimeMethod, time);
     clearJNIEnv();
     return std::make_shared<SKAndroidNativeFrameWrapper>(runtime, jvm, bitmap);
 };
  int SKAndroidNativeVideoWrapper::numFrames() {
      JNIEnv *env = getJNIEnv();
-     jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-     if(!NativeVideoWrapperJavaGetNumFramesMethod) {
-         NativeVideoWrapperJavaGetNumFramesMethod = env->GetMethodID(MyClass, "getNumFrames",
-                                                                       "()I");
-     }
      int res = env->CallIntMethod(javaVideoWrapper, NativeVideoWrapperJavaGetNumFramesMethod);
      clearJNIEnv();
      return res;
@@ -117,11 +109,6 @@ SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
 
  double SKAndroidNativeVideoWrapper::frameRate() {
      JNIEnv *env = getJNIEnv();
-     jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-     if(!NativeVideoWrapperJavaGetFrameRateMethod) {
-         NativeVideoWrapperJavaGetFrameRateMethod = env->GetMethodID(MyClass, "getFrameRate",
-                                                                     "()D");
-     }
      double ret = env->CallDoubleMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameRateMethod);
      clearJNIEnv();
      return ret;
@@ -129,15 +116,6 @@ SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
 
  SKRNSize SKAndroidNativeVideoWrapper::size() {
      JNIEnv *env = getJNIEnv();
-     jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-     if(!NativeVideoWrapperJavaGetWidthMethod) {
-         NativeVideoWrapperJavaGetWidthMethod = env->GetMethodID(MyClass, "getWidth",
-                                                                     "()I");
-     }
-     if(!NativeVideoWrapperJavaGetHeightMethod) {
-         NativeVideoWrapperJavaGetHeightMethod = env->GetMethodID(MyClass, "getHeight",
-                                                                 "()I");
-     }
      int width = env->CallIntMethod(javaVideoWrapper, NativeVideoWrapperJavaGetWidthMethod);
      int height = env->CallIntMethod(javaVideoWrapper, NativeVideoWrapperJavaGetHeightMethod);
      clearJNIEnv();
@@ -146,11 +124,6 @@ SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
 
  double SKAndroidNativeVideoWrapper::duration() {
      JNIEnv *env = getJNIEnv();
-     jclass MyClass = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-     if(!NativeVideoWrapperJavaGetDurationMethod) {
-         NativeVideoWrapperJavaGetDurationMethod = env->GetMethodID(MyClass, "getDuration",
-                                                                    "()D");
-     }
      double ret = env->CallDoubleMethod(javaVideoWrapper, NativeVideoWrapperJavaGetDurationMethod);
      clearJNIEnv();
      return ret;
@@ -158,11 +131,6 @@ SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
 
 
 void SKAndroidNativeVideoWrapper::initListHelper(JNIEnv *env) {
-    java_util_List      = static_cast<jclass>(env->NewGlobalRef(env->FindClass("java/util/List")));
-    java_util_List_     = env->GetMethodID(java_util_List, "<init>", "()V");
-    java_util_List_size = env->GetMethodID (java_util_List, "size", "()I");
-    java_util_List_get  = env->GetMethodID(java_util_List, "get", "(I)Ljava/lang/Object;");
-    java_util_List_add  = env->GetMethodID(java_util_List, "add", "(Ljava/lang/Object;)Z");
 }
 
 // Adapted from https://stackoverflow.com/a/33408920/4469172
@@ -207,11 +175,8 @@ void SKAndroidNativeFrameWrapper::close() {
 
 SKRNSize SKAndroidNativeFrameWrapper::size() {
     JNIEnv *env = getJNIEnv();
-    jclass bitmapclass = env->FindClass("android/graphics/Bitmap");
-    jmethodID widthGet = env->GetMethodID(bitmapclass, "getWidth", "()I");
-    jmethodID heightGet = env->GetMethodID(bitmapclass, "getHeight", "()I");
-    int width = env->CallIntMethod(bitmap, widthGet);
-    int height = env->CallIntMethod(bitmap, heightGet);
+    int width = env->CallIntMethod(bitmap, BitmapGetWidthMethod);
+    int height = env->CallIntMethod(bitmap, BitmapGetHeightMethod);
 //    env->CallDoubleMethod(bitmap, bitmapclass, "" )
     clearJNIEnv();
     return (SKRNSize){(double)width, (double)height};
@@ -248,4 +213,43 @@ static std::string jstring2string(JNIEnv *env, jstring jStr) {
     env->DeleteLocalRef(stringJbytes);
     env->DeleteLocalRef(stringClass);
     return ret;
+}
+
+// Following this great example here
+// https://github.com/rdixonbhw/ReactNative-JNI-Blog/blob/master/android/app/src/main/jni/hello_world.c
+// Which can be cross-referenced here https://thebhwgroup.com/blog/react-native-jni
+extern "C"
+jint JNI_OnLoad(JavaVM *vm, void *reserved) {
+    JNIEnv *env;
+    if(vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        return -1;
+    }
+    java_util_List      = static_cast<jclass>(env->NewGlobalRef(env->FindClass("java/util/List")));
+    java_util_List_     = env->GetMethodID(java_util_List, "<init>", "()V");
+    java_util_List_size = env->GetMethodID (java_util_List, "size", "()I");
+    java_util_List_get  = env->GetMethodID(java_util_List, "get", "(I)Ljava/lang/Object;");
+    java_util_List_add  = env->GetMethodID(java_util_List, "add", "(Ljava/lang/Object;)Z");
+
+    jclass SKNativeVideoCLS = (jclass)env->NewGlobalRef(env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide"));
+    NativeVideoWrapperJavaSideClass = SKNativeVideoCLS;
+    NativeVideoWrapperJavaGetDurationMethod = env->GetMethodID(SKNativeVideoCLS, "getDuration", "()D");
+    NativeVideoWrapperJavaGetFrameRateMethod = env->GetMethodID(SKNativeVideoCLS, "getFrameRate", "()D");
+    NativeVideoWrapperJavaGetWidthMethod = env->GetMethodID(SKNativeVideoCLS, "getWidth","()I");
+    NativeVideoWrapperJavaGetNumFramesMethod = env->GetMethodID(SKNativeVideoCLS, "getNumFrames","()I");
+    NativeVideoWrapperJavaGetFrameAtIndexMethod = env->GetMethodID(SKNativeVideoCLS, "getFrameAtIndex",
+                                                                   "(I)Landroid/graphics/Bitmap;");
+    NativeVideoWrapperJavaGetFramesAtIndexMethod = env->GetMethodID(SKNativeVideoCLS, "getFramesAtIndex",
+                                                                    "(II)Ljava/util/List;");
+    NativeVideoWrapperJavaGetFrameAtTimeMethod = env->GetMethodID(SKNativeVideoCLS, "getFrameAtTime",
+                                                                  "(D)Landroid/graphics/Bitmap;");
+    NativeVideoWrapperJavaGetHeightMethod = env->GetMethodID(SKNativeVideoCLS, "getHeight",
+                                                             "()I");
+    NativeVideoWrapperJavaSideClassConstructor = env->GetMethodID(SKNativeVideoCLS, "<init>",
+                                                                  "(Ljava/lang/String;)V");
+
+    BitmapClassRef = (jclass)env->NewGlobalRef(env->FindClass("android/graphics/Bitmap"));
+    BitmapGetWidthMethod = env->GetMethodID(BitmapClassRef, "getWidth", "()I");
+    BitmapGetHeightMethod = env->GetMethodID(BitmapClassRef, "getHeight", "()I");
+
+    return JNI_VERSION_1_6;
 }

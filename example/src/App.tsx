@@ -40,7 +40,7 @@ export default function App() {
     }
     video = video!; // Make typescript not complain.
     const frame = video.getFrameAtIndex(frameIdx);
-    Alert.alert(`Video frame ${frameIdx} isValid ${frame.isValid} frameSize ${JSON.stringify(frame.size)}`);
+    console.log(`Video frame is${JSON.stringify(frame)}`);
     // const arrayBuffer = frame.arrayBuffer;
     // console.log('arrayBuffer status', arrayBuffer);
     setFrame(frame);
