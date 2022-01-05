@@ -9,6 +9,12 @@
 #import "SKiOSNativeVideoCPP.h"
 #import "react-native-native-video.h"
 
+@interface SKRNNativeFrameView() {
+    UIImageView *imageView;
+}
+@property (readonly) UIImageView *imageView;
+@end
+
 using namespace SKRNNativeVideo;
 @implementation SKRNNativeFrameViewManager
 RCT_EXPORT_MODULE(SKRNNativeFrameView)
@@ -16,6 +22,23 @@ RCT_EXPORT_MODULE(SKRNNativeFrameView)
 - (SKRNNativeFrameView *)view
 {
   return [[SKRNNativeFrameView alloc] init];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(resizeMode, NSString *, SKRNNativeFrameView) {
+    if(![json isKindOfClass:[NSString class]]) {
+        NSLog(@"got weird resizeMode");
+        return;
+    }
+    NSString *mode = (NSString *)json;
+    if([mode isEqualToString:@"contain"]) {
+        view.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    }
+    else if([mode isEqualToString:@"cover"]) {
+        view.imageView.contentMode = UIViewContentModeScaleAspectFill;
+    }
+    else if([mode isEqualToString:@"stretch"]) {
+        view.imageView.contentMode = UIViewContentModeScaleToFill;
+    }
 }
 
 RCT_CUSTOM_VIEW_PROPERTY(frameData, id, SKRNNativeFrameView) {
@@ -32,21 +55,18 @@ RCT_CUSTOM_VIEW_PROPERTY(frameData, id, SKRNNativeFrameView) {
             return;
         }
         SKiOSNativeFrameWrapper *wrapper = (SKiOSNativeFrameWrapper *)ptr;
-        [view showDisplayBuffer:wrapper->buffer orientation:wrapper->orientation];
+        [view showDisplayBuffer:wrapper->buffer transform:wrapper->transform];
+//        [view showDisplayBuffer:wrapper->buffer orientation:wrapper->orientation];
     }
 }
 
-RCT_EXPORT_METHOD(setFrameData:(id)data) {
-    NSLog(@"got frameData %@", data);
-}
 
 @end
 
 @implementation SKRNNativeFrameView {
-    UIImageView *imageView;
 }
 @synthesize image = _image;
-
+@synthesize imageView;
 -(id)initWithCoder:(NSCoder *)coder {
     self = [super initWithCoder:coder];
     if(!self) return nil;
@@ -62,6 +82,7 @@ RCT_EXPORT_METHOD(setFrameData:(id)data) {
 -(void)commonInit {
     imageView = [[UIImageView alloc] initWithFrame:self.bounds];
     imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    imageView.contentMode = UIViewContentModeScaleAspectFit;
     [self addSubview:imageView];
 }
 -(void)showDisplayBuffer:(CMSampleBufferRef)buffer {
@@ -100,9 +121,4 @@ RCT_EXPORT_METHOD(setFrameData:(id)data) {
     _image = image;
     imageView.image = image;
 }
--(void)layoutSubviews {
-    [super layoutSubviews];
-    NSLog(@"layoutsubviews with frame %@", NSStringFromCGRect(self.frame));
-}
-
 @end

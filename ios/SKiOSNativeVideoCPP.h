@@ -35,7 +35,7 @@ public:
 
 class SKiOSNativeVideoWrapper : public SKNativeVideoWrapper {
     int _numFrames;
-    NSDictionary <NSNumber *, NSValue *>*frameTimeMap;
+    NSArray <NSValue *>*frameTimeMap;
     UIImageOrientation orientation = UIImageOrientationUp;
 public:
     NSError *_lastError;

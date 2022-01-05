@@ -30,6 +30,8 @@ export interface NativeFrameWrapper {
   arrayBuffer(): ArrayBuffer;
   size: { width: number, height: number };
   isValid: boolean;
+  /** Currently iOS only */
+  resizeMode?: 'contain' | 'cover' | 'stretch'
 }
 
 export interface NativeVideoWrapper {

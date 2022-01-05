@@ -14,6 +14,8 @@ using namespace facebook;
 static int clampInt(int val, int min, int max);
 static CMTime cmTimeFromValue(NSValue *value);
 
+static NSArray <NSValue *>*sortedCMTimeArrayFromCMTimeSet(NSSet <NSValue *>*inSet);
+
 SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri) : SKNativeVideoWrapper(runtime, sourceUri)
 {
     // See here https://developer.apple.com/forums/thread/42751 :: Resource for reading CMSampleBufferRef frames from video
@@ -94,20 +96,49 @@ void SKiOSNativeVideoWrapper::initialReadAsset() {
     //     videoTrack.nominalFrameRate;
     int frameIndex = 0;
     // Generate map of CMTime for people
-    NSMutableDictionary <NSNumber *, NSValue *>*frameTimeMapObj = [NSMutableDictionary new];
     CMSampleBufferRef buffer = [fastOutput copyNextSampleBuffer];
+    NSMutableSet <NSValue *>*existingValues = [NSMutableSet new];
+//    CMTime mostRecentTime = CMTimeMake(0, 60);
     while(buffer != NULL) {
         CMTime frameTime = CMSampleBufferGetOutputPresentationTimeStamp(buffer);
-        [frameTimeMapObj setObject:[NSValue valueWithCMTime:frameTime] forKey:@(frameIndex)];
-        frameIndex++;
+//        if(CMTimeCompare(mostRecentTime, frameTime) > 0) {
+//            NSLog(@"previous time more than nowTime for %@", [NSValue valueWithCMTime:frameTime]);
+//        }
+//        mostRecentTime = frameTime;
+        // CMTime seems to be roughly arranged (not always in order), for example, in a 60FPS iPhone video
+        // the previous time more than nowTime dialogue occurs roughly 16 times / second
+        NSValue *frameTimeValue = [NSValue valueWithCMTime:frameTime];
+        if([existingValues containsObject:frameTimeValue]) {
+            // If already has CMTime for this frameIndex, skip
+            // Usually get `Already has object for CMTime: {0/600 = 0.00}` (or {INVALID} sometimes)
+            NSLog(@"Already has object for time %@", frameTimeValue);
+        }
+        else {
+            if(CMTIME_IS_INVALID(frameTime)) {
+                // Do not process if invalid
+            }
+            else {
+                [existingValues addObject:frameTimeValue];
+                frameIndex++;
+            }
+        }
         // Next loop
         buffer = [fastOutput copyNextSampleBuffer];
     }
-    frameTimeMap = frameTimeMapObj;
+    frameTimeMap = sortedCMTimeArrayFromCMTimeSet(existingValues);
     // Set the numFrames
     _numFrames = frameIndex;
     // This works fine
 //    NSLog(@"got numframes and frameTimeMap %d, %@", _numFrames, frameTimeMap);
+}
+
+// Inspired by this https://stackoverflow.com/a/9046695/4469172
+NSArray <NSValue *>*sortedCMTimeArrayFromCMTimeSet(NSSet <NSValue *>*inSet) {
+        NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:nil ascending:YES comparator:^NSComparisonResult(NSValue *obj1, NSValue *obj2) {
+            return (NSComparisonResult)CMTimeCompare(obj1.CMTimeValue, obj2.CMTimeValue);
+        }];
+        NSArray *ret = [inSet sortedArrayUsingDescriptors:@[sortDescriptor]];
+        return ret;
 }
 
 std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtTime(double time) {
@@ -115,7 +146,10 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtTime(do
     return getFrameAtIndex(approximateFrame);
 }
 std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(int frameIdx) {
-    NSValue *value = [frameTimeMap objectForKey:@(frameIdx)];
+    if(frameIdx >= frameTimeMap.count || frameIdx < 0) {
+        return std::shared_ptr<SKNativeFrameWrapper>(nullptr);
+    }
+    NSValue *value = [frameTimeMap objectAtIndex:frameIdx];
 //    NSLog(@"got value for frameIdx %d, value %@", frameIdx, value);
     CMTime cmTime = cmTimeFromValue(value);
     [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeMake(cmTime, CMTimeMakeWithSeconds(1/frameRate(), videoTrack.naturalTimeScale))]]];
@@ -141,8 +175,8 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     index = clampInt(index, 0, _numFrames);
     int toIndex = index + numFrames;
     toIndex = clampInt(toIndex, 0, _numFrames);
-    NSValue *value = [frameTimeMap objectForKey:@(index)];
-    NSValue *toValue = [frameTimeMap objectForKey:@(toIndex)];
+    NSValue *value = [frameTimeMap objectAtIndex:index];
+    NSValue *toValue = [frameTimeMap objectAtIndex:toIndex];
     CMTime fromTime = cmTimeFromValue(value);
     CMTime toTime = cmTimeFromValue(toValue);
     [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeFromTimeToTime(fromTime, toTime)]]];
@@ -252,6 +286,7 @@ double SKRNNativeVideo::SKRNNVCGAffineTransformGetRotation(CGAffineTransform tra
 
 UIImageOrientation SKRNNativeVideo::SKRNNVRotationValueToUIImageOrientation(double rotation) {
     // UIImageRotations are clockwise
+    NSLog(@"rotation was %f", rotation);
     if(rotation >= 0) {
         switch((int)(rotation/M_PI_4)) {
             default:
