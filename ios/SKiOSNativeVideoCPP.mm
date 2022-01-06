@@ -72,6 +72,7 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
 void SKiOSNativeVideoWrapper::initialReadAsset() {
     double rotation = SKRNNVCGAffineTransformGetRotation(videoTrack.preferredTransform);
     orientation = SKRNNVRotationValueToUIImageOrientation(rotation);
+    NSLog(@"got orientation %d", orientation);
     NSError *assetReaderError;
     AVAssetReader *fastReader = [AVAssetReader assetReaderWithAsset:asset error:&assetReaderError];
     if(assetReaderError) {
@@ -285,6 +286,12 @@ CMTime cmTimeFromValue(NSValue *value) {
 }
 
 double SKRNNativeVideo::SKRNNVCGAffineTransformGetRotation(CGAffineTransform transform) {
+    // using a flipped transform since it's iOS (should be transform.b, transform.a in most other systems)
+    /*
+     | a  b  0 |  | 0    1   0 |
+     | c  d  0 |  | -1   0   0 |
+     | tx ty 1 |  | 1080 0   1 |
+     */
     return atan2(transform.b, transform.a);
 }
 
@@ -292,7 +299,9 @@ UIImageOrientation SKRNNativeVideo::SKRNNVRotationValueToUIImageOrientation(doub
     // UIImageRotations are clockwise
     NSLog(@"rotation was %f", rotation);
     if(rotation >= 0) {
-        switch((int)(rotation/M_PI_4)) {
+        int switchVal = (int)(rotation/M_PI_4);
+        NSLog(@"switchVal %d", switchVal);
+        switch(switchVal) {
             default:
             case 0: return UIImageOrientationUp; // 0-45°
             case 1: // 45-90°
@@ -307,7 +316,9 @@ UIImageOrientation SKRNNativeVideo::SKRNNVRotationValueToUIImageOrientation(doub
     }
     else {
         // Rotation < 0
-        switch((int)(-rotation/M_PI_4)) {
+        int switchVal = (int)(-rotation/M_PI_4);
+        NSLog(@"switchVal %d", switchVal);
+        switch(switchVal) {
             default:
             case 0: return UIImageOrientationUp; // 0-45°
             case 1: // 45-90°
