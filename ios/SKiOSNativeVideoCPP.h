@@ -44,6 +44,7 @@ public:
     AVAssetTrack *videoTrack;
     AVAssetReaderTrackOutput *readerOutput;
     SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri);
+    ~SKiOSNativeVideoWrapper();
     virtual void close();
     virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index);
     virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(int index, int numFrames);

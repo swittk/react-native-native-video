@@ -66,6 +66,10 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
     }
     // Make sure readerOutput reads till null so we can reset safely
     while([readerOutput copyNextSampleBuffer] != NULL) {}
+    setValid(true);
+}
+SKiOSNativeVideoWrapper::~SKiOSNativeVideoWrapper() {
+    close();
 }
 
 // This skims through the asset and get the frame time maps
@@ -212,10 +216,12 @@ double SKiOSNativeVideoWrapper::duration() {
 
 void SKiOSNativeVideoWrapper::close() {
     _lastError = nil;
+    frameTimeMap = nil;
     asset = nil;
     reader = nil;
     videoTrack = nil;
     readerOutput = nil;
+    setValid(false);
 }
 //SKiOSNativeFrameWrapper SKiOSNativeVideoWrapper::getNativeFrame() {
 //    return SKiOSNativeFrameWrapper()
@@ -261,7 +267,7 @@ SKRNSize SKiOSNativeFrameWrapper::size() {
 }
 
 void SKiOSNativeFrameWrapper::close() {
-    if(buffer) {
+    if(buffer != NULL) {
         CMSampleBufferInvalidate(buffer);
         CFRelease(buffer);
         buffer = NULL;
@@ -269,9 +275,7 @@ void SKiOSNativeFrameWrapper::close() {
     }
 }
 SKiOSNativeFrameWrapper::~SKiOSNativeFrameWrapper() {
-    if(buffer != NULL) {
-        close();
-    }
+    close();
 }
 
 int clampInt(int val, int min, int max) {

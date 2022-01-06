@@ -73,6 +73,15 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "sourceUri"_sh: {
             return jsi::String::createFromUtf8(runtime, sourceUri);
         } break;
+        case "close"_sh: {
+            return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
+                                                                               size_t count) -> jsi::Value
+                                                                           {
+                close();
+                return jsi::Value::undefined();
+            });
+        } break;
+
         default:
             break;
     }
@@ -87,7 +96,8 @@ static std::vector<std::string> nativeVideoWrapperKeys = {
     "getFrameAtTime",
     "isValid",
     "duration",
-    "sourceUri"
+    "sourceUri",
+    "close"
 };
 
 std::vector<jsi::PropNameID> SKNativeVideoWrapper::getPropertyNames(jsi::Runtime& rt) {

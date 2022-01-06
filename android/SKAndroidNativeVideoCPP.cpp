@@ -63,18 +63,18 @@ SKAndroidNativeVideoWrapper::SKAndroidNativeVideoWrapper(
 //    env->GetObjectClass();
 }
 SKAndroidNativeVideoWrapper::~SKAndroidNativeVideoWrapper() {
-    if(javaVideoWrapper != nullptr) {
-        close();
-    }
+    close();
 }
 
 void SKAndroidNativeVideoWrapper::close() {
-    // TODO: Cleanup
-    JNIEnv *env = getJNIEnv();
-    setValid(false);
-    env->DeleteGlobalRef(javaVideoWrapper);
-    javaVideoWrapper = nullptr;
-    clearJNIEnv();
+    if(javaVideoWrapper != nullptr) {
+        // TODO: Cleanup
+        JNIEnv *env = getJNIEnv();
+        setValid(false);
+        env->DeleteGlobalRef(javaVideoWrapper);
+        javaVideoWrapper = nullptr;
+        clearJNIEnv();
+    }
 }
 
 std::shared_ptr<SKNativeFrameWrapper>
@@ -174,17 +174,17 @@ SKNativeFrameWrapper(_runtime), jvm(_vm)
     clearJNIEnv();
 }
 SKAndroidNativeFrameWrapper::~SKAndroidNativeFrameWrapper() {
-    if(bitmap != nullptr) {
-        close();
-    }
+     close();
 }
 
 void SKAndroidNativeFrameWrapper::close() {
-    JNIEnv *env = getJNIEnv();
-    setValid(false);
-    env->DeleteGlobalRef(bitmap);
-    bitmap = nullptr;
-    clearJNIEnv();
+    if(bitmap != nullptr) {
+        JNIEnv *env = getJNIEnv();
+        setValid(false);
+        env->DeleteGlobalRef(bitmap);
+        bitmap = nullptr;
+        clearJNIEnv();
+    }
 }
 
 SKRNSize SKAndroidNativeFrameWrapper::size() {
