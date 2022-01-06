@@ -100,6 +100,10 @@ void SKiOSNativeVideoWrapper::initialReadAsset() {
     NSMutableSet <NSValue *>*existingValues = [NSMutableSet new];
 //    CMTime mostRecentTime = CMTimeMake(0, 60);
     while(buffer != NULL) {
+        // Get size of buffer because sometimes it's zero and we don't want that
+        // It appears that sometimes size of CMSampleBuffer is zero
+        // This occurs at the start of the video (frameIndex 0), and at the last frame of the video
+        size_t size = CMSampleBufferGetSampleSize(buffer, 0);
         CMTime frameTime = CMSampleBufferGetOutputPresentationTimeStamp(buffer);
 //        if(CMTimeCompare(mostRecentTime, frameTime) > 0) {
 //            NSLog(@"previous time more than nowTime for %@", [NSValue valueWithCMTime:frameTime]);
@@ -108,14 +112,14 @@ void SKiOSNativeVideoWrapper::initialReadAsset() {
         // CMTime seems to be roughly arranged (not always in order), for example, in a 60FPS iPhone video
         // the previous time more than nowTime dialogue occurs roughly 16 times / second
         NSValue *frameTimeValue = [NSValue valueWithCMTime:frameTime];
-        if([existingValues containsObject:frameTimeValue]) {
-            // If already has CMTime for this frameIndex, skip
-            // Usually get `Already has object for CMTime: {0/600 = 0.00}` (or {INVALID} sometimes)
-            NSLog(@"Already has object for time %@", frameTimeValue);
+        if(CMTIME_IS_INVALID(frameTime) || size == 0) {
+            // Do not process if invalid or has no size (generally occurs at either start or end of video)
         }
         else {
-            if(CMTIME_IS_INVALID(frameTime)) {
-                // Do not process if invalid
+            if([existingValues containsObject:frameTimeValue]) {
+                // If already has CMTime for this frameIndex, skip
+                // Usually get `Already has object for CMTime: {0/600 = 0.00}` (or {INVALID} sometimes)
+                NSLog(@"Already has object for time %@ currentCount %d", frameTimeValue, frameIndex);
             }
             else {
                 [existingValues addObject:frameTimeValue];
