@@ -31,7 +31,9 @@ export interface NativeFrameWrapper {
   size: { width: number, height: number };
   isValid: boolean;
   /** Currently iOS only */
-  resizeMode?: 'contain' | 'cover' | 'stretch'
+  resizeMode?: 'contain' | 'cover' | 'stretch';
+  /** Call this to free the frame once it gets unused; best to call it or risk potential leaks */
+  close(): void;
 }
 
 export interface NativeVideoWrapper {

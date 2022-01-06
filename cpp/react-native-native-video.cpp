@@ -103,7 +103,8 @@ static std::vector<std::string> nativeFrameWrapperKeys = {
     "arrayBuffer",
     "size",
     "isValid",
-    "nativePtrStr"
+    "nativePtrStr",
+    "close"
 };
 jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameID &name) {
     std::string methodName = name.utf8(runtime);
@@ -128,6 +129,14 @@ jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "nativePtrStr"_sh: {
             std::string str = PointerToString(this);
             return jsi::String::createFromUtf8(runtime, str);
+        } break;
+        case "close"_sh: {
+            return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
+                                                                               size_t count) -> jsi::Value
+                                                                           {
+                close();
+                return jsi::Value::undefined();
+            });
         } break;
         default:
         break;

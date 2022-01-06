@@ -62,11 +62,18 @@ SKAndroidNativeVideoWrapper::SKAndroidNativeVideoWrapper(
 //    env->Call
 //    env->GetObjectClass();
 }
+SKAndroidNativeVideoWrapper::~SKAndroidNativeVideoWrapper() {
+    if(javaVideoWrapper != nullptr) {
+        close();
+    }
+}
 
 void SKAndroidNativeVideoWrapper::close() {
     // TODO: Cleanup
     JNIEnv *env = getJNIEnv();
+    setValid(false);
     env->DeleteGlobalRef(javaVideoWrapper);
+    javaVideoWrapper = nullptr;
     clearJNIEnv();
 }
 
@@ -166,10 +173,17 @@ SKNativeFrameWrapper(_runtime), jvm(_vm)
     // TODO: DO MORE
     clearJNIEnv();
 }
+SKAndroidNativeFrameWrapper::~SKAndroidNativeFrameWrapper() {
+    if(bitmap != nullptr) {
+        close();
+    }
+}
 
 void SKAndroidNativeFrameWrapper::close() {
     JNIEnv *env = getJNIEnv();
+    setValid(false);
     env->DeleteGlobalRef(bitmap);
+    bitmap = nullptr;
     clearJNIEnv();
 }
 

@@ -26,6 +26,7 @@ namespace SKRNNativeVideo {
         jobject bitmap;
         /** The bitmap is retained by this wrapper */
         SKAndroidNativeFrameWrapper(facebook::jsi::Runtime &_runtime, JavaVM *_vm, jobject _bitmap);
+        ~SKAndroidNativeFrameWrapper();
         // Make sure to implement these methods!
         /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
         virtual std::string platform() { return "Android"; };
@@ -59,6 +60,7 @@ namespace SKRNNativeVideo {
         }
 
         SKAndroidNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri, JavaVM* jvm);
+        ~SKAndroidNativeVideoWrapper();
 
         virtual void close();
 
