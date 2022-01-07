@@ -180,7 +180,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
     int extraCount = 0;
     CMSampleBufferRef trash = [readerOutput copyNextSampleBuffer];
     while(trash != NULL) {
-        CMSampleBufferIsValid(trash);
+        CMSampleBufferInvalidate(trash);
         CFRelease(trash);
         extraCount++;
         trash = [readerOutput copyNextSampleBuffer];
@@ -202,7 +202,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret;
     while(buf != NULL) {
         ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation));
-        CMSampleBufferInvalidate(buf);
+        // Just release, don't do an oopsie and accidentally invalidate it like last time
         CFRelease(buf);
         buf = [readerOutput copyNextSampleBuffer];
     }

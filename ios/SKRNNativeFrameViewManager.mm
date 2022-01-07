@@ -126,6 +126,9 @@ RCT_CUSTOM_VIEW_PROPERTY(frameData, id, SKRNNativeFrameView) {
 }
 -(void)showDisplayBuffer:(CMSampleBufferRef)buffer orientation:(UIImageOrientation)orientation {
     CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
+    if(!buf) {
+        NSLog(@"SKRNNV : unable to get CVImageBufferRef from CMSampleBufferRef");
+    }
     CFRetain(buf);
     CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
     // As for why we're using imageByApplyingOrientation instead of just creating [UIImage imageWithCIImage:size:orientation:], the reason is that the orientation property somehow is disregarded by the UIImageView with that method.
