@@ -32,7 +32,7 @@ export interface NativeFrameWrapper {
   isValid: boolean;
   /** Currently iOS only */
   resizeMode?: 'contain' | 'cover' | 'stretch';
-  /** Call this to free the frame once it gets unused; best to call it or risk potential leaks */
+  /** Call this to free the frame once it gets unused; call it if memory is very crucial */
   close(): void;
 }
 
@@ -47,6 +47,8 @@ export interface NativeVideoWrapper {
   getFrameAtIndex(idx: number): NativeFrameWrapper;
   getFramesAtIndex(idx: number, len: number): NativeFrameWrapper[];
   getFrameAtTime(time: number): NativeFrameWrapper;
+    /** Call this to free the video once it gets unused; call it if memory is very crucial */
+  close(): void;
 }
 
 const SKRNNativeFrameView = requireNativeComponent<NativeVideoFrameViewProps>('SKRNNativeFrameView');

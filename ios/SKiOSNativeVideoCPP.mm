@@ -52,6 +52,7 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
     }];
     } @catch(NSError *e) {
         NSLog(@"caught error with reading, %@", e);
+        return;
     }
 //    reader.timeRange = kCMTimeRangeZero;
     // Make sure we support random access otherwise we won't be able to seek!
@@ -65,7 +66,12 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
         return;
     }
     // Make sure readerOutput reads till null so we can reset safely
-    while([readerOutput copyNextSampleBuffer] != NULL) {}
+    CMSampleBufferRef trash = [readerOutput copyNextSampleBuffer];
+    while(trash != NULL) {
+        CMSampleBufferInvalidate(trash);
+        CFRelease(trash);
+    }
+//    checker = [SKRNNVRetainChecker new];
     setValid(true);
 }
 SKiOSNativeVideoWrapper::~SKiOSNativeVideoWrapper() {
@@ -131,6 +137,8 @@ void SKiOSNativeVideoWrapper::initialReadAsset() {
                 frameIndex++;
             }
         }
+        CMSampleBufferInvalidate(buffer);
+        CFRelease(buffer);
         // Next loop
         buffer = [fastOutput copyNextSampleBuffer];
     }
@@ -172,6 +180,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
     int extraCount = 0;
     CMSampleBufferRef trash = [readerOutput copyNextSampleBuffer];
     while(trash != NULL) {
+        CMSampleBufferIsValid(trash);
         CFRelease(trash);
         extraCount++;
         trash = [readerOutput copyNextSampleBuffer];
@@ -193,6 +202,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret;
     while(buf != NULL) {
         ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation));
+        CMSampleBufferInvalidate(buf);
         CFRelease(buf);
         buf = [readerOutput copyNextSampleBuffer];
     }
@@ -215,12 +225,21 @@ double SKiOSNativeVideoWrapper::duration() {
 }
 
 void SKiOSNativeVideoWrapper::close() {
+    NSLog(@"video close() called");
+//    CFBridgingRelease((__bridge void *)_lastError);
+//    CFBridgingRelease((__bridge void *)frameTimeMap);
+//    CFBridgingRelease((__bridge void *)asset);
+//    CFBridgingRelease((__bridge void *)reader);
+//    CFBridgingRelease((__bridge void *)videoTrack);
+//    CFBridgingRelease((__bridge void *)readerOutput);
+//    NSLog(@"released all");
     _lastError = nil;
     frameTimeMap = nil;
     asset = nil;
     reader = nil;
     videoTrack = nil;
     readerOutput = nil;
+    checker = nil;
     setValid(false);
 }
 //SKiOSNativeFrameWrapper SKiOSNativeVideoWrapper::getNativeFrame() {
@@ -336,3 +355,11 @@ UIImageOrientation SKRNNativeVideo::SKRNNVRotationValueToUIImageOrientation(doub
         }
     }
 }
+
+@implementation SKRNNVRetainChecker
+
+-(void)dealloc {
+    NSLog(@"dealloc called");
+}
+
+@end

@@ -12,6 +12,9 @@
 #ifndef SKiOSNativeVideoCPP_hpp
 #define SKiOSNativeVideoCPP_hpp
 
+@interface SKRNNVRetainChecker : NSObject
+@end
+
 namespace SKRNNativeVideo {
 double SKRNNVCGAffineTransformGetRotation(CGAffineTransform transform);
 UIImageOrientation SKRNNVRotationValueToUIImageOrientation(double rotation);
@@ -43,6 +46,7 @@ public:
     AVAssetReader *reader;
     AVAssetTrack *videoTrack;
     AVAssetReaderTrackOutput *readerOutput;
+    SKRNNVRetainChecker *checker;
     SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri);
     ~SKiOSNativeVideoWrapper();
     virtual void close();
