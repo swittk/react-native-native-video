@@ -70,6 +70,7 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
     while(trash != NULL) {
         CMSampleBufferInvalidate(trash);
         CFRelease(trash);
+        trash = [readerOutput copyNextSampleBuffer];
     }
 //    checker = [SKRNNVRetainChecker new];
     setValid(true);
