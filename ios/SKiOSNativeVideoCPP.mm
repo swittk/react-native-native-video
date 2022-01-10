@@ -194,36 +194,45 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     index = clampInt(index, 0, _numFrames - 1);
     // Need to use exclusiveTo (gone over by 1 frame, because it seems resetForReadingTimeRanges excludes the `to` time);
     int exclusiveToIndex = index + numFrames;
-    exclusiveToIndex = clampInt(exclusiveToIndex, 0, _numFrames);
     NSValue *value = [frameTimeMap objectAtIndex:index];
     CMTime fromTime = cmTimeFromValue(value);
     
-    NSValue *toValue = [frameTimeMap objectAtIndex:exclusiveToIndex];
     CMTime toTime;
-    if(!toValue) {
-        // If the `exclusive` index does not exist, then we simply move it down to the one before last
-        int toIndex = exclusiveToIndex - 1;
-        toValue = [frameTimeMap objectAtIndex:toIndex];
+    if(exclusiveToIndex > _numFrames - 1) {
+//        toTime = kCMTimePositiveInfinity;
+        // If the `exclusive` index does not exist, then we simply move it to the last one and go up by a bit
+        NSValue *toValue = [frameTimeMap lastObject];
         toTime = cmTimeFromValue(toValue);
         // Add 0.5 of the timescale to the value in order to `go over` the last frame's time by a bit so it gets fetched too.
         toTime.timescale = toTime.timescale * 2;
         toTime.value = toTime.value * 2 + 1;
     }
     else {
+        NSValue *toValue = [frameTimeMap objectAtIndex:exclusiveToIndex];
         toTime = cmTimeFromValue(toValue);
     }
     [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeFromTimeToTime(fromTime, toTime)]]];
     CMSampleBufferRef buf = [readerOutput copyNextSampleBuffer];
     std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret;
     while(buf != NULL) {
-        ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation));
+        // CMSampleBufferGetSampleSize doesn't work for decoded frames (will return 0 in size always).
+        CMTime frameTime = CMSampleBufferGetOutputPresentationTimeStamp(buf);
+        
+        if(!CMSampleBufferIsValid(buf)) {
+            // Do nothing
+        }
+        else if(CMTIME_IS_INVALID(frameTime)) {
+            // Do nothing
+        }
+        else {
+            ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation));
+        }
         // Just release, don't do an oopsie and accidentally invalidate it like last time
         CFRelease(buf);
         buf = [readerOutput copyNextSampleBuffer];
     }
     return ret;
 }
-
 double SKiOSNativeVideoWrapper::frameRate() {
     return videoTrack.nominalFrameRate;
 }
