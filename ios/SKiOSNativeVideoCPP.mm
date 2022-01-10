@@ -194,7 +194,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     index = clampInt(index, 0, _numFrames - 1);
     // Need to use exclusiveTo (gone over by 1 frame, because it seems resetForReadingTimeRanges excludes the `to` time);
     int exclusiveToIndex = index + numFrames;
-    exclusiveToIndex = clampInt(exclusiveToIndex, 0, _numFrames - 1);
+    exclusiveToIndex = clampInt(exclusiveToIndex, 0, _numFrames);
     NSValue *value = [frameTimeMap objectAtIndex:index];
     CMTime fromTime = cmTimeFromValue(value);
     
