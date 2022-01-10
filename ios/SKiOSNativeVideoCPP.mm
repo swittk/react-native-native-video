@@ -191,9 +191,9 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
 }
 
 std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getFramesAtIndex(int index, int numFrames) {
-    index = clampInt(index, 0, _numFrames);
-    int toIndex = index + numFrames;
-    toIndex = clampInt(toIndex, 0, _numFrames);
+    index = clampInt(index, 0, _numFrames - 1);
+    int toIndex = index + numFrames - 1;
+    toIndex = clampInt(toIndex, 0, _numFrames - 1);
     NSValue *value = [frameTimeMap objectAtIndex:index];
     NSValue *toValue = [frameTimeMap objectAtIndex:toIndex];
     CMTime fromTime = cmTimeFromValue(value);
