@@ -15,6 +15,18 @@ static int clampInt(int val, int min, int max);
 static CMTime cmTimeFromValue(NSValue *value);
 
 static NSArray <NSValue *>*sortedCMTimeArrayFromCMTimeSet(NSSet <NSValue *>*inSet);
+static CGImagePropertyOrientation SKRNNVCGImagePropertyOrientationForUIImageOrientation(UIImageOrientation uiOrientation) {
+    switch (uiOrientation) {
+        case UIImageOrientationUp: return kCGImagePropertyOrientationUp;
+        case UIImageOrientationDown: return kCGImagePropertyOrientationDown;
+        case UIImageOrientationLeft: return kCGImagePropertyOrientationLeft;
+        case UIImageOrientationRight: return kCGImagePropertyOrientationRight;
+        case UIImageOrientationUpMirrored: return kCGImagePropertyOrientationUpMirrored;
+        case UIImageOrientationDownMirrored: return kCGImagePropertyOrientationDownMirrored;
+        case UIImageOrientationLeftMirrored: return kCGImagePropertyOrientationLeftMirrored;
+        case UIImageOrientationRightMirrored: return kCGImagePropertyOrientationRightMirrored;
+    }
+}
 
 SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri) : SKNativeVideoWrapper(runtime, sourceUri)
 {
@@ -320,12 +332,14 @@ SKRNSize SKiOSNativeFrameWrapper::size() {
 }
 
 std::string SKiOSNativeFrameWrapper::base64(std::string format) {
+    if(!buffer) return std::string();
     if(!format.size()) {
         format = "png";
     }
     CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
     CFRetain(buf);
     CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
+    image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
 //    size_t width = CVPixelBufferGetWidth(buf);
 //    size_t height = CVPixelBufferGetHeight(buf);
     UIImage *uiImage = [UIImage imageWithCIImage:image];
@@ -341,6 +355,7 @@ std::string SKiOSNativeFrameWrapper::base64(std::string format) {
         // Return PNG
         str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
     }
+    CFRelease(buf);
     return std::string([str UTF8String]);
 }
 
