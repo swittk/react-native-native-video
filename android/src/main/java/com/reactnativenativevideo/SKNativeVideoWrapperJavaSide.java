@@ -3,6 +3,7 @@ package com.reactnativenativevideo;
 import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
 import android.os.Build;
+import android.util.Base64;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -11,6 +12,7 @@ import androidx.annotation.RequiresApi;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,23 @@ public class SKNativeVideoWrapperJavaSide {
     mediaRetriever = new MediaMetadataRetriever();
     mediaRetriever.setDataSource(path);
   }
+
+  // Following here https://stackoverflow.com/a/9224180/4469172
+  static String Base64StringForBitmap(Bitmap bitmap, String format) {
+    if(format == null || format.length() == 0) {
+      format = "png";
+    }
+    Bitmap.CompressFormat compressFormat = Bitmap.CompressFormat.PNG;
+    if(format == "png") { compressFormat = Bitmap.CompressFormat.PNG; }
+    else if(format == "jpg" || format == "jpeg") { compressFormat = Bitmap.CompressFormat.JPEG; }
+
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    bitmap.compress(compressFormat, 100, byteArrayOutputStream);
+    byte[] byteArray = byteArrayOutputStream .toByteArray();
+    String encoded = Base64.encodeToString(byteArray, Base64.DEFAULT);
+    return encoded;
+  }
+
 
   @RequiresApi(api = Build.VERSION_CODES.P)
   Bitmap getFrameAtIndex(int index) {

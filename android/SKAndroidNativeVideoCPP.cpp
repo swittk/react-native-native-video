@@ -23,6 +23,7 @@ jmethodID NativeVideoWrapperJavaGetDurationMethod = 0;
 jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
 jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
 jmethodID NativeVideoWrapperJavaSideClassConstructor = 0;
+jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod = 0;
 
 jmethodID BitmapGetWidthMethod = 0;
 jmethodID BitmapGetHeightMethod = 0;
@@ -196,6 +197,15 @@ SKRNSize SKAndroidNativeFrameWrapper::size() {
     return (SKRNSize){(double)width, (double)height};
 }
 
+std::string SKAndroidNativeFrameWrapper::base64(std::string format) {
+    JNIEnv *env = getJNIEnv();
+//    jclass SKNativeVideoCLS = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
+//    jmethodID strForBitmap = env->GetStaticMethodID(SKNativeVideoCLS, "Base64StringForBitmap", "(Landroid/graphics/Bitmap;Ljava/lang/String;)Ljava/lang/String;");
+    // Call the Java side to do the conversion.
+    jstring retStr = (jstring)env->CallStaticObjectMethod(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideBase64ForBitmapMethod, bitmap, env->NewStringUTF(format.c_str()));
+    return std::string(env->GetStringUTFChars(retStr, 0));
+}
+
 
 extern "C"
 JNIEXPORT jobject JNICALL
@@ -260,6 +270,7 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
                                                              "()I");
     NativeVideoWrapperJavaSideClassConstructor = env->GetMethodID(SKNativeVideoCLS, "<init>",
                                                                   "(Ljava/lang/String;)V");
+    NativeVideoWrapperJavaSideBase64ForBitmapMethod = env->GetStaticMethodID(SKNativeVideoCLS, "Base64StringForBitmap", "(Landroid/graphics/Bitmap;Ljava/lang/String;)Ljava/lang/String;");
 
     BitmapClassRef = (jclass)env->NewGlobalRef(env->FindClass("android/graphics/Bitmap"));
     BitmapGetWidthMethod = env->GetMethodID(BitmapClassRef, "getWidth", "()I");

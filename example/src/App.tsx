@@ -45,6 +45,9 @@ export default function App() {
     // console.log('arrayBuffer status', arrayBuffer);
     setFrame(frame);
   }
+  const onTryBase64 = () => {
+    console.log('got b64', frame?.base64().slice(0, 128));
+  }
 
   const recentAnimFrame = React.useRef<ReturnType<typeof requestAnimationFrame>>();
   const safeSetViewFrameIndex = React.useCallback((idx: number) => {
@@ -92,6 +95,7 @@ export default function App() {
         style={{ backgroundColor: 'green', borderWidth: 1, borderRadius: 8, flex: 1, alignSelf: 'stretch' }}
         frameData={frame}
       />
+      <Button title='See base64 in console' onPress={onTryBase64} />
     </View>
   );
 }

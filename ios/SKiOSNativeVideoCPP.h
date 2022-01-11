@@ -20,6 +20,8 @@ double SKRNNVCGAffineTransformGetRotation(CGAffineTransform transform);
 UIImageOrientation SKRNNVRotationValueToUIImageOrientation(double rotation);
 
 class SKiOSNativeFrameWrapper : public SKNativeFrameWrapper {
+    bool _hasSize = false;
+    SKRNSize _size;
 public:
     CMSampleBufferRef buffer;
     CGAffineTransform transform;
@@ -34,12 +36,16 @@ public:
     // Supposed to return ArrayBuffer
     virtual facebook::jsi::Value arrayBufferValue();
     virtual SKRNSize size();
+    virtual std::string base64(std::string format);
 };
 
 class SKiOSNativeVideoWrapper : public SKNativeVideoWrapper {
     int _numFrames;
     NSArray <NSValue *>*frameTimeMap;
     UIImageOrientation orientation = UIImageOrientationUp;
+    bool _hasSize = false;
+    SKRNSize _size;
+    
 public:
     NSError *_lastError;
     AVAsset *asset;

@@ -238,9 +238,14 @@ double SKiOSNativeVideoWrapper::frameRate() {
 }
 
 SKRNSize SKiOSNativeVideoWrapper::size() {
+    if(_hasSize) {
+        return _size;
+    }
     AVAssetTrack *track = videoTrack;
     CGSize size = CGSizeApplyAffineTransform(track.naturalSize, track.preferredTransform);
-    return (SKRNSize){ .width = size.width, .height = size.height };
+    _size = (SKRNSize){ .width = size.width, .height = size.height };
+    _hasSize = true;
+    return _size;
 }
 
 double SKiOSNativeVideoWrapper::duration() {
@@ -300,14 +305,45 @@ SKRNSize SKiOSNativeFrameWrapper::size() {
         NSLog(@"Sample buffer is invalid");
         return (SKRNSize){0, 0};
     }
+    if(_hasSize) {
+        return _size;
+    }
     CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(buffer);
     CVPixelBufferLockBaseAddress(imageBuffer,0);
     size_t width = CVPixelBufferGetWidth(imageBuffer);
     size_t height = CVPixelBufferGetHeight(imageBuffer);
     CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
 //    NSLog(@"Got frame size %zu, %zu", width, height);
-    return (SKRNSize){.width = (double)width, .height = (double)height};
+    _size = (SKRNSize){.width = (double)width, .height = (double)height};
+    _hasSize = true;
+    return _size;
 }
+
+std::string SKiOSNativeFrameWrapper::base64(std::string format) {
+    if(!format.size()) {
+        format = "png";
+    }
+    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
+    CFRetain(buf);
+    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
+//    size_t width = CVPixelBufferGetWidth(buf);
+//    size_t height = CVPixelBufferGetHeight(buf);
+    UIImage *uiImage = [UIImage imageWithCIImage:image];
+    
+    NSString *str;
+    if(format == "png") {
+        str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
+    }
+    else if(format == "jpg" || format == "jpeg") {
+        str = [UIImageJPEGRepresentation(uiImage, 1.0) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
+    }
+    else {
+        // Return PNG
+        str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
+    }
+    return std::string([str UTF8String]);
+}
+
 
 void SKiOSNativeFrameWrapper::close() {
     if(buffer != NULL) {

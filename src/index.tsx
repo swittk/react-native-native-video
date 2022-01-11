@@ -34,6 +34,7 @@ export interface NativeFrameWrapper {
   resizeMode?: 'contain' | 'cover' | 'stretch';
   /** Call this to free the frame once it gets unused; call it if memory is very crucial */
   close(): void;
+  base64(opts?: { format?: 'png' | 'jpg' }): string;
 }
 
 export interface NativeVideoWrapper {
@@ -47,7 +48,7 @@ export interface NativeVideoWrapper {
   getFrameAtIndex(idx: number): NativeFrameWrapper;
   getFramesAtIndex(idx: number, len: number): NativeFrameWrapper[];
   getFrameAtTime(time: number): NativeFrameWrapper;
-    /** Call this to free the video once it gets unused; call it if memory is very crucial */
+  /** Call this to free the video once it gets unused; call it if memory is very crucial */
   close(): void;
 }
 

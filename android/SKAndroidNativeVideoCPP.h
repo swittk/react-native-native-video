@@ -35,6 +35,7 @@ namespace SKRNNativeVideo {
         // Supposed to return ArrayBuffer
         virtual facebook::jsi::Value arrayBufferValue() { return facebook::jsi::Value::undefined(); }
         virtual SKRNSize size();
+        virtual std::string base64(std::string format);
     };
 
     class SKAndroidNativeVideoWrapper : public SKNativeVideoWrapper {

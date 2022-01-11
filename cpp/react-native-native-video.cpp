@@ -114,7 +114,8 @@ static std::vector<std::string> nativeFrameWrapperKeys = {
     "size",
     "isValid",
     "nativePtrStr",
-    "close"
+    "close",
+    "base64"
 };
 jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameID &name) {
     std::string methodName = name.utf8(runtime);
@@ -146,6 +147,28 @@ jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
                                                                            {
                 close();
                 return jsi::Value::undefined();
+            });
+        } break;
+        case "base64"_sh: {
+            return jsi::Function::createFromHostFunction(runtime, name, 1, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
+                                                                               size_t count) -> jsi::Value
+                                                                           {
+                std::string res;
+                if(count < 1) {
+                    res = base64();
+                }
+                else {
+                    jsi::Object obj = arguments[0].asObject(runtime);
+                    jsi::Value fmtVal = obj.getProperty(runtime, "format");
+                    if(fmtVal.isString()) {
+                        jsi::String fmt = fmtVal.asString(runtime);
+                        res = base64(fmt.utf8(runtime));
+                    }
+                    else {
+                        res = "";
+                    }
+                }
+                return jsi::String::createFromUtf8(runtime, std::move(res));
             });
         } break;
         default:
