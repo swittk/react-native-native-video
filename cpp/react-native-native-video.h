@@ -1,5 +1,5 @@
-#ifndef EXAMPLE_H
-#define EXAMPLE_H
+#ifndef REACT_NATIVE_NATIVE_VIDEO_COMMON_HEADER_FILE
+#define REACT_NATIVE_NATIVE_VIDEO_COMMON_HEADER_FILE
 #include <memory>
 #include <jsi/jsi.h>
 
@@ -85,4 +85,4 @@ public:
 };
 }
 
-#endif /* EXAMPLE_H */
+#endif /* REACT_NATIVE_NATIVE_VIDEO_COMMON_HEADER_FILE */

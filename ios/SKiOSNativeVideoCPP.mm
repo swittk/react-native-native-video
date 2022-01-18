@@ -346,14 +346,14 @@ std::string SKiOSNativeFrameWrapper::base64(std::string format) {
     
     NSString *str;
     if(format == "png") {
-        str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
+        str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:0];
     }
     else if(format == "jpg" || format == "jpeg") {
-        str = [UIImageJPEGRepresentation(uiImage, 1.0) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
+        str = [UIImageJPEGRepresentation(uiImage, 1.0) base64EncodedStringWithOptions:0];
     }
     else {
         // Return PNG
-        str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
+        str = [UIImagePNGRepresentation(uiImage) base64EncodedStringWithOptions:0];
     }
     CFRelease(buf);
     return std::string([str UTF8String]);
