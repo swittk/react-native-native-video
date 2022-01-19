@@ -30,6 +30,13 @@ export default function App() {
     Alert.alert(`Opened video`, `Video props are duration : ${video.duration}, frameRate: ${video.frameRate}, numFrames ${video.numFrames}, size ${video.size}`);
     setNumFrames(video.numFrames);
   }
+  React.useEffect(()=>{
+    if(!frame) return;
+    const arrBuf = frame.arrayBuffer();
+    const fArr = new Float32Array(arrBuf);
+    console.log('frame arraybuf is', fArr.slice(0, 3).map((v)=>Number(v)));
+    console.log('frame arraybuf len', fArr.length);
+  }, [frame]);
 
   const onVideoFrameTest = async () => {
     if (!pickedUri) return;

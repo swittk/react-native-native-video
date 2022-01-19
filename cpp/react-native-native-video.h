@@ -59,6 +59,7 @@ public:
     virtual facebook::jsi::Value arrayBufferValue() { return facebook::jsi::Value::undefined(); }
     virtual SKRNSize size() {return (SKRNSize){0, 0};}
     virtual std::string base64(std::string format = "") {return std::string();}
+    virtual std::string md5() {return std::string();}
 };
 
 class SKNativeVideoWrapper : public facebook::jsi::HostObject {

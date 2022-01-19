@@ -17,6 +17,12 @@ typedef struct Float32MallocatedPointerStruct {
     Float32 *ptr;
     size_t len;
 } Float32MallocatedPointerStruct;
+
+typedef struct UInt32MallocatedPointerStruct {
+    UInt32 *ptr;
+    size_t len;
+} UInt32MallocatedPointerStruct;
+
 }
 
 CFDictionaryRef SKRN_GetCVPixelBufferAttributesForGlCompatibility();
@@ -37,4 +43,11 @@ CVPixelBufferRef SKRN_convertPixelBufferToPixelFormat(CVPixelBufferRef input, OS
 
 SKRNNativeVideo::Float32MallocatedPointerStruct rawDataFromCMSampleBuffer(CMSampleBufferRef buffer);
 
+SKRNNativeVideo::UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBuffer(CMSampleBufferRef buffer);
+NSData *RawRGBA32NSDataFromCMSampleBuffer(CMSampleBufferRef buffer);
+
+SKRNNativeVideo::Float32MallocatedPointerStruct RawFloat32RGBAScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer);
+NSData *RawFloat32RGBAScaledNSDataFromCMSampleBuffer(CMSampleBufferRef buffer);
+
+SKRNNativeVideo::Float32MallocatedPointerStruct RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer);
 #endif /* iOSVideoUtils_hpp */

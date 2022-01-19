@@ -296,6 +296,87 @@ CVPixelBufferRef SKRN_convertPixelBufferToPixelFormat(CVPixelBufferRef input, OS
   return output;
 }
 
+NSData *RawRGBA32NSDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBuffer(buffer);
+    NSData *ret = [NSData dataWithBytesNoCopy:res.ptr length:res.len];
+    return ret;
+}
+
+NSData *RawFloat32RGBAScaledNSDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    Float32MallocatedPointerStruct res = RawFloat32RGBAScaledDataFromDataFromCMSampleBuffer(buffer);
+    return [NSData dataWithBytesNoCopy:(void *)res.ptr length:res.len];
+}
+
+Float32MallocatedPointerStruct RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    Float32 maxChannelValueScale = 1/255.0;
+    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBuffer(buffer);
+//    size_t stride = sizeof(UInt32); // stride = 4 (it's RGBA32 = 4 bytes)
+    size_t numIntermediateElements = res.len; // Num elements = number of bytes exactly component
+    size_t numOutElements = res.len * 3/4; // Num elements = 3/4 * number of bytes exactly since we drop the alpha component
+    size_t intermediateAllocSize = numIntermediateElements * sizeof(Float32);
+    size_t outAllocSize = numOutElements * sizeof(Float32);
+    // Copies a vector to another vector (single-precision).
+    Float32 *intermediateBuffer = (Float32 *)malloc(intermediateAllocSize);
+    Float32 *outBuffer = (Float32 *)malloc(outAllocSize);
+    
+    // Convert from int8 to float32
+    vDSP_vfltu8((unsigned char *)res.ptr, 1, intermediateBuffer, 1, numIntermediateElements);
+    
+    // Free original pointer
+    free(res.ptr);
+    
+    // Copy channels, one by one
+    int numChannelElements = (int)numOutElements/3;
+    cblas_scopy(numChannelElements, intermediateBuffer, 4, outBuffer, 3); // Copy R channel
+    cblas_scopy(numChannelElements, intermediateBuffer + 1, 4, outBuffer + 1, 3); // Copy G channel
+    cblas_scopy(numChannelElements, intermediateBuffer + 2, 4, outBuffer + 2, 3); // Copy B channel
+    free(intermediateBuffer);
+    // Scale by 1/(maximum channel value)
+    vDSP_vsmul(outBuffer, 1, &maxChannelValueScale, outBuffer, 1, numOutElements);
+    return (Float32MallocatedPointerStruct) {
+        .ptr = outBuffer,
+        .len = outAllocSize
+    };
+}
+
+
+Float32MallocatedPointerStruct RawFloat32RGBAScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    Float32 maxChannelValueScale = 1/255.0;
+    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBuffer(buffer);
+//    size_t stride = sizeof(UInt32); // stride = 4 (it's RGBA32 = 4 bytes)
+    size_t numElements = res.len; // Num elements = number of bytes exactly since every component is 1 byte (RGBA = 4 bytes)
+    size_t outAllocSize = numElements * sizeof(Float32);
+    Float32 *outBuffer = (Float32 *)malloc(outAllocSize);
+    // Convert from int8 to float32
+    vDSP_vfltu8((unsigned char *)res.ptr, 1, outBuffer, 1, numElements);
+    
+    free(res.ptr);
+    // Scale by 1/(maximum channel value)
+    vDSP_vsmul(outBuffer, 1, &maxChannelValueScale, outBuffer, 1, numElements);
+    return (Float32MallocatedPointerStruct) {
+        .ptr = outBuffer,
+        .len = outAllocSize
+    };
+}
+
+UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    CVImageBufferRef _imageBuffer = CMSampleBufferGetImageBuffer(buffer);
+    CIImage *image = [CIImage imageWithCVPixelBuffer:_imageBuffer];
+    CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    CIContext *context = [CIContext contextWithOptions:@{
+        kCIContextOutputColorSpace: (__bridge id)rgbColorSpace,
+        kCIContextUseSoftwareRenderer:@(NO)
+    }];
+    
+    size_t outBytesPerRow = 4 * image.extent.size.width;
+    size_t dataSize = outBytesPerRow * image.extent.size.height;
+    void *outRenderBytes = malloc(dataSize);
+    [context render:image toBitmap:outRenderBytes rowBytes:outBytesPerRow bounds:image.extent format:kCIFormatRGBA8 colorSpace:rgbColorSpace];
+    CGColorSpaceRelease(rgbColorSpace);
+    UInt32MallocatedPointerStruct ret = (UInt32MallocatedPointerStruct){.ptr = (UInt32 *)outRenderBytes, .len = dataSize };
+    return ret;
+}
+
 Float32MallocatedPointerStruct rawDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
     CVImageBufferRef _imageBuffer = CMSampleBufferGetImageBuffer(buffer);
     if(CVPixelBufferIsPlanar(_imageBuffer)) {

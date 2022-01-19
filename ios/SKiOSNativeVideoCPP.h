@@ -37,6 +37,7 @@ public:
     virtual facebook::jsi::Value arrayBufferValue();
     virtual SKRNSize size();
     virtual std::string base64(std::string format);
+    virtual std::string md5();
 };
 
 class SKiOSNativeVideoWrapper : public SKNativeVideoWrapper {

@@ -28,12 +28,12 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "getFrameAtIndex"_sh:{
             return jsi::Function::createFromHostFunction(runtime, name, 1, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
-//                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
+                                                         {
+                //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
                 int idx = arguments[0].asNumber();
                 auto res = getFrameAtIndex(idx);
                 if(res.get() == nullptr) {
-//                    return jsi::Value::undefined();
+                    //                    return jsi::Value::undefined();
                     throw jsi::JSError(runtime, "Failed to get frame");
                 }
                 return jsi::Object::createFromHostObject(runtime, res);
@@ -42,8 +42,8 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "getFramesAtIndex"_sh: {
             return jsi::Function::createFromHostFunction(runtime, name, 2, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
-//                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
+                                                         {
+                //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
                 int idx = arguments[0].asNumber();
                 int len = arguments[1].asNumber();
                 auto frames = getFramesAtIndex(idx, len);
@@ -53,12 +53,12 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "getFrameAtTime"_sh: {
             return jsi::Function::createFromHostFunction(runtime, name, 1, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
-//                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
+                                                         {
+                //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
                 double time = arguments[0].asNumber();
                 auto res = getFrameAtTime(time);
                 if(res.get() == nullptr) {
-//                    return jsi::Value::undefined();
+                    //                    return jsi::Value::undefined();
                     throw jsi::JSError(runtime, "Failed to get frame");
                 }
                 return jsi::Object::createFromHostObject(runtime, res);
@@ -76,12 +76,12 @@ jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "close"_sh: {
             return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
+                                                         {
                 close();
                 return jsi::Value::undefined();
             });
         } break;
-
+            
         default:
             break;
     }
@@ -115,7 +115,8 @@ static std::vector<std::string> nativeFrameWrapperKeys = {
     "isValid",
     "nativePtrStr",
     "close",
-    "base64"
+    "base64",
+    "png_md5"
 };
 jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameID &name) {
     std::string methodName = name.utf8(runtime);
@@ -124,12 +125,12 @@ jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "arrayBuffer"_sh: {
             return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
-//                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
+                                                         {
+                //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
                 return arrayBufferValue();
             });
-
-//            printf("ArrayBuffer called with hash %llu when methodSwitch is %llu and method is %s", "arrayBuffer"_sh, methodSwitch, methodName.c_str());
+            
+            //            printf("ArrayBuffer called with hash %llu when methodSwitch is %llu and method is %s", "arrayBuffer"_sh, methodSwitch, methodName.c_str());
         } break;
         case "size"_sh: {
             return ObjectFromSKRNSize(runtime, size());
@@ -144,15 +145,15 @@ jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
         case "close"_sh: {
             return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
+                                                         {
                 close();
                 return jsi::Value::undefined();
             });
         } break;
         case "base64"_sh: {
-            return jsi::Function::createFromHostFunction(runtime, name, 1, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
+            return jsi::Function::createFromHostFunction(runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments,
                                                                                size_t count) -> jsi::Value
-                                                                           {
+                                                         {
                 std::string res;
                 if(count < 1) {
                     res = base64();
@@ -171,8 +172,16 @@ jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
                 return jsi::String::createFromUtf8(runtime, std::move(res));
             });
         } break;
+        case "md5"_sh: {
+            return jsi::Function::createFromHostFunction
+            (runtime, name, 0, [&](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *arguments, size_t count) -> jsi::Value
+             {
+                return jsi::String::createFromUtf8(runtime, md5());
+            });
+            
+        } break;
         default:
-        break;
+            break;
     }
     return jsi::Value::undefined();
 }
@@ -198,14 +207,14 @@ void install(facebook::jsi::Runtime &jsiRuntime, std::function<std::shared_ptr<S
                                           jsiRuntime,
                                           PropNameID::forAscii(jsiRuntime, "SKRNNativeVideoOpenVideo"),
                                           0,
-//                                          [&, invoker](Runtime &runtime, const Value &thisValue, const Value *arguments,
+                                          //                                          [&, invoker](Runtime &runtime, const Value &thisValue, const Value *arguments,
                                           [&, videoConstructor](Runtime &runtime, const Value &thisValue, const Value *arguments,
-                                                       size_t count) -> Value
+                                                                size_t count) -> Value
                                           {
                                               if(count < 1) return jsi::Value::undefined();
                                               std::string path = arguments[0].asString(runtime).utf8(runtime);
                                               std::shared_ptr<SKNativeVideoWrapper> obj = videoConstructor(runtime, path);
-//                                              auto obj = std::make_shared<SKNativeVideoWrapper>(runtime, path);
+                                              //                                              auto obj = std::make_shared<SKNativeVideoWrapper>(runtime, path);
                                               jsi::Object object = jsi::Object::createFromHostObject(runtime, obj);
                                               return object;
                                           });

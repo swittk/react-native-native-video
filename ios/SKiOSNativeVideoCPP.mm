@@ -7,6 +7,7 @@
 
 #include "SKiOSNativeVideoCPP.h"
 #include "iOSVideoUtils.h"
+#import <CommonCrypto/CommonDigest.h>
 
 using namespace SKRNNativeVideo;
 using namespace facebook;
@@ -59,14 +60,14 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
     NSLog(@"created reader");
     // Need to specify outputSettings, or CMSampleBufferGetImageBuffer will return NULL (since the frames are not decompressed)
     @try {
-    readerOutput = [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTrack outputSettings:@{
-        (__bridge NSString *)kCVPixelBufferPixelFormatTypeKey:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
-    }];
+        readerOutput = [[AVAssetReaderTrackOutput alloc] initWithTrack:videoTrack outputSettings:@{
+            (__bridge NSString *)kCVPixelBufferPixelFormatTypeKey:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+        }];
     } @catch(NSError *e) {
         NSLog(@"caught error with reading, %@", e);
         return;
     }
-//    reader.timeRange = kCMTimeRangeZero;
+    //    reader.timeRange = kCMTimeRangeZero;
     // Make sure we support random access otherwise we won't be able to seek!
     readerOutput.supportsRandomAccess = YES;
     [reader addOutput:readerOutput];
@@ -84,7 +85,7 @@ SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime
         CFRelease(trash);
         trash = [readerOutput copyNextSampleBuffer];
     }
-//    checker = [SKRNNVRetainChecker new];
+    //    checker = [SKRNNVRetainChecker new];
     setValid(true);
 }
 SKiOSNativeVideoWrapper::~SKiOSNativeVideoWrapper() {
@@ -122,17 +123,17 @@ void SKiOSNativeVideoWrapper::initialReadAsset() {
     // Generate map of CMTime for people
     CMSampleBufferRef buffer = [fastOutput copyNextSampleBuffer];
     NSMutableSet <NSValue *>*existingValues = [NSMutableSet new];
-//    CMTime mostRecentTime = CMTimeMake(0, 60);
+    //    CMTime mostRecentTime = CMTimeMake(0, 60);
     while(buffer != NULL) {
         // Get size of buffer because sometimes it's zero and we don't want that
         // It appears that sometimes size of CMSampleBuffer is zero
         // This occurs at the start of the video (frameIndex 0), and at the last frame of the video
         size_t size = CMSampleBufferGetSampleSize(buffer, 0);
         CMTime frameTime = CMSampleBufferGetOutputPresentationTimeStamp(buffer);
-//        if(CMTimeCompare(mostRecentTime, frameTime) > 0) {
-//            NSLog(@"previous time more than nowTime for %@", [NSValue valueWithCMTime:frameTime]);
-//        }
-//        mostRecentTime = frameTime;
+        //        if(CMTimeCompare(mostRecentTime, frameTime) > 0) {
+        //            NSLog(@"previous time more than nowTime for %@", [NSValue valueWithCMTime:frameTime]);
+        //        }
+        //        mostRecentTime = frameTime;
         // CMTime seems to be roughly arranged (not always in order), for example, in a 60FPS iPhone video
         // the previous time more than nowTime dialogue occurs roughly 16 times / second
         NSValue *frameTimeValue = [NSValue valueWithCMTime:frameTime];
@@ -159,16 +160,16 @@ void SKiOSNativeVideoWrapper::initialReadAsset() {
     // Set the numFrames
     _numFrames = frameIndex;
     // This works fine
-//    NSLog(@"got numframes and frameTimeMap %d, %@", _numFrames, frameTimeMap);
+    //    NSLog(@"got numframes and frameTimeMap %d, %@", _numFrames, frameTimeMap);
 }
 
 // Inspired by this https://stackoverflow.com/a/9046695/4469172
 NSArray <NSValue *>*sortedCMTimeArrayFromCMTimeSet(NSSet <NSValue *>*inSet) {
-        NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:nil ascending:YES comparator:^NSComparisonResult(NSValue *obj1, NSValue *obj2) {
-            return (NSComparisonResult)CMTimeCompare(obj1.CMTimeValue, obj2.CMTimeValue);
-        }];
-        NSArray *ret = [inSet sortedArrayUsingDescriptors:@[sortDescriptor]];
-        return ret;
+    NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:nil ascending:YES comparator:^NSComparisonResult(NSValue *obj1, NSValue *obj2) {
+        return (NSComparisonResult)CMTimeCompare(obj1.CMTimeValue, obj2.CMTimeValue);
+    }];
+    NSArray *ret = [inSet sortedArrayUsingDescriptors:@[sortDescriptor]];
+    return ret;
 }
 
 std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtTime(double time) {
@@ -180,7 +181,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
         return std::shared_ptr<SKNativeFrameWrapper>(nullptr);
     }
     NSValue *value = [frameTimeMap objectAtIndex:frameIdx];
-//    NSLog(@"got value for frameIdx %d, value %@", frameIdx, value);
+    //    NSLog(@"got value for frameIdx %d, value %@", frameIdx, value);
     CMTime cmTime = cmTimeFromValue(value);
     [readerOutput resetForReadingTimeRanges:@[[NSValue valueWithCMTimeRange:CMTimeRangeMake(cmTime, CMTimeMakeWithSeconds(1/frameRate(), videoTrack.naturalTimeScale))]]];
     CMSampleBufferRef buf = [readerOutput copyNextSampleBuffer];
@@ -198,7 +199,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
         extraCount++;
         trash = [readerOutput copyNextSampleBuffer];
     }
-//    NSLog(@"got frame at index %d with extraCount %d", frameIdx, extraCount);
+    //    NSLog(@"got frame at index %d with extraCount %d", frameIdx, extraCount);
     return std::move(ret);
 }
 
@@ -211,7 +212,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
     
     CMTime toTime;
     if(exclusiveToIndex > _numFrames - 1) {
-//        toTime = kCMTimePositiveInfinity;
+        //        toTime = kCMTimePositiveInfinity;
         // If the `exclusive` index does not exist, then we simply move it to the last one and go up by a bit
         NSValue *toValue = [frameTimeMap lastObject];
         toTime = cmTimeFromValue(toValue);
@@ -267,13 +268,13 @@ double SKiOSNativeVideoWrapper::duration() {
 
 void SKiOSNativeVideoWrapper::close() {
     NSLog(@"video close() called");
-//    CFBridgingRelease((__bridge void *)_lastError);
-//    CFBridgingRelease((__bridge void *)frameTimeMap);
-//    CFBridgingRelease((__bridge void *)asset);
-//    CFBridgingRelease((__bridge void *)reader);
-//    CFBridgingRelease((__bridge void *)videoTrack);
-//    CFBridgingRelease((__bridge void *)readerOutput);
-//    NSLog(@"released all");
+    //    CFBridgingRelease((__bridge void *)_lastError);
+    //    CFBridgingRelease((__bridge void *)frameTimeMap);
+    //    CFBridgingRelease((__bridge void *)asset);
+    //    CFBridgingRelease((__bridge void *)reader);
+    //    CFBridgingRelease((__bridge void *)videoTrack);
+    //    CFBridgingRelease((__bridge void *)readerOutput);
+    //    NSLog(@"released all");
     _lastError = nil;
     frameTimeMap = nil;
     asset = nil;
@@ -297,14 +298,14 @@ SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime
 }
 facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue() {
     //    jsi::ArrayBuffer
-    Float32MallocatedPointerStruct ret = rawDataFromCMSampleBuffer(buffer);
+    Float32MallocatedPointerStruct ret = RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(buffer);
     if(ret.ptr == NULL) {
         NSLog(@"rawDataPtr is NULL");
         return facebook::jsi::Value::undefined();
     }
     // Create ArrayBuffer
     jsi::Function arrayBufferCtor = runtime.global().getPropertyAsFunction(runtime, "ArrayBuffer");
-    size_t totalBytes = ret.len * sizeof(Float32);
+    size_t totalBytes = ret.len;
     jsi::Object o = arrayBufferCtor.callAsConstructor(runtime, jsi::Value((int)totalBytes)).getObject(runtime);
     jsi::ArrayBuffer buf = o.getArrayBuffer(runtime);
     memcpy(buf.data(runtime), ret.ptr, totalBytes);
@@ -325,7 +326,7 @@ SKRNSize SKiOSNativeFrameWrapper::size() {
     size_t width = CVPixelBufferGetWidth(imageBuffer);
     size_t height = CVPixelBufferGetHeight(imageBuffer);
     CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
-//    NSLog(@"Got frame size %zu, %zu", width, height);
+    //    NSLog(@"Got frame size %zu, %zu", width, height);
     _size = (SKRNSize){.width = (double)width, .height = (double)height};
     _hasSize = true;
     return _size;
@@ -340,8 +341,8 @@ std::string SKiOSNativeFrameWrapper::base64(std::string format) {
     CFRetain(buf);
     CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
     image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
-//    size_t width = CVPixelBufferGetWidth(buf);
-//    size_t height = CVPixelBufferGetHeight(buf);
+    //    size_t width = CVPixelBufferGetWidth(buf);
+    //    size_t height = CVPixelBufferGetHeight(buf);
     UIImage *uiImage = [UIImage imageWithCIImage:image];
     
     NSString *str;
@@ -359,6 +360,33 @@ std::string SKiOSNativeFrameWrapper::base64(std::string format) {
     return std::string([str UTF8String]);
 }
 
+// Adapted from https://gist.github.com/fcandalija/1359520
+static std::string md5ForNSData(NSData *data) {
+    // Create byte array of unsigned chars
+    unsigned char md5Buffer[CC_MD5_DIGEST_LENGTH];
+    // Create 16 byte MD5 hash value, store in buffer
+    CC_MD5(data.bytes, (unsigned int)data.length, md5Buffer);
+    // Convert unsigned char buffer to NSString of hex values
+        NSMutableString *output = [NSMutableString stringWithCapacity:CC_MD5_DIGEST_LENGTH * 2];
+        for(int i = 0; i < CC_MD5_DIGEST_LENGTH; i++)
+            [output appendFormat:@"%02x",md5Buffer[i]];
+    return std::string([output cStringUsingEncoding:NSUTF8StringEncoding]);
+}
+
+std::string SKiOSNativeFrameWrapper::md5() {
+    if(!buffer) return std::string();
+    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
+    CFRetain(buf);
+    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
+    image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
+    //    size_t width = CVPixelBufferGetWidth(buf);
+    //    size_t height = CVPixelBufferGetHeight(buf);
+    UIImage *uiImage = [UIImage imageWithCIImage:image];
+    NSData *pngData = UIImageJPEGRepresentation(uiImage, 1);
+    std::string ret = md5ForNSData(pngData);
+    CFRelease(buf);
+    return ret;
+}
 
 void SKiOSNativeFrameWrapper::close() {
     if(buffer != NULL) {

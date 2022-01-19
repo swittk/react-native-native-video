@@ -35,6 +35,9 @@ export interface NativeFrameWrapper {
   /** Call this to free the frame once it gets unused; call it if memory is very crucial */
   close(): void;
   base64(opts?: { format?: 'png' | 'jpg' }): string;
+
+  // BETA: MD5 hash of the frame, however, it's not the same across platforms & not the same as in FFMPEG yet
+  md5(): string;
 }
 
 export interface NativeVideoWrapper {
