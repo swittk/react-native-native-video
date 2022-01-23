@@ -8,6 +8,25 @@
 #include "iOSVideoUtils.h"
 using namespace SKRNNativeVideo;
 
+static CGImagePropertyOrientation SKRNNVCGImagePropertyOrientationForUIImageOrientation(UIImageOrientation uiOrientation) {
+    switch (uiOrientation) {
+        case UIImageOrientationUp: return kCGImagePropertyOrientationUp;
+        case UIImageOrientationDown: return kCGImagePropertyOrientationDown;
+        case UIImageOrientationLeft: return kCGImagePropertyOrientationLeft;
+        case UIImageOrientationRight: return kCGImagePropertyOrientationRight;
+        case UIImageOrientationUpMirrored: return kCGImagePropertyOrientationUpMirrored;
+        case UIImageOrientationDownMirrored: return kCGImagePropertyOrientationDownMirrored;
+        case UIImageOrientationLeftMirrored: return kCGImagePropertyOrientationLeftMirrored;
+        case UIImageOrientationRightMirrored: return kCGImagePropertyOrientationRightMirrored;
+    }
+}
+
+static void CVPixelBufferReleaseSimpleFreeMallocedBytesCallback(void *releaseRefCon, const void *baseAddress) {
+    free((void *)baseAddress);
+}
+
+
+
 inline vImage_Buffer vImageForCVPixelBuffer(CVPixelBufferRef pixel_buffer) {
   return {.data = CVPixelBufferGetBaseAddress(pixel_buffer),
           .width = CVPixelBufferGetWidth(pixel_buffer),
@@ -296,8 +315,8 @@ CVPixelBufferRef SKRN_convertPixelBufferToPixelFormat(CVPixelBufferRef input, OS
   return output;
 }
 
-NSData *RawRGBA32NSDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
-    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBuffer(buffer);
+NSData *RawRGBA32NSDataFromCMSampleBuffer(CMSampleBufferRef buffer, UIImageOrientation orientation) {
+    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBufferAndOrientation(buffer, orientation);
     NSData *ret = [NSData dataWithBytesNoCopy:res.ptr length:res.len];
     return ret;
 }
@@ -306,6 +325,96 @@ NSData *RawFloat32RGBAScaledNSDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
     Float32MallocatedPointerStruct res = RawFloat32RGBAScaledDataFromDataFromCMSampleBuffer(buffer);
     return [NSData dataWithBytesNoCopy:(void *)res.ptr length:res.len];
 }
+
+NSData *RawBGR24NSDataFromCMSampleBuffer(CMSampleBufferRef buffer, UIImageOrientation orientation) {
+    UInt8MallocatedPointerStruct res = RawBGR24DataFromCMSampleBufferAndOrientation(buffer, orientation);
+    return [NSData dataWithBytesNoCopy:res.ptr length:res.len];
+}
+NSData *RawRGB24NSDataFromCMSampleBuffer(CMSampleBufferRef buffer, UIImageOrientation orientation) {
+    UInt8MallocatedPointerStruct res = RawRGB24DataFromCMSampleBufferAndOrientation(buffer, orientation);
+    return [NSData dataWithBytesNoCopy:res.ptr length:res.len];
+}
+
+
+SKRNNativeVideo::UInt8MallocatedPointerStruct RawBGR24DataFromCMSampleBufferAndOrientation
+(
+ CMSampleBufferRef buffer, UIImageOrientation orientation
+ ) {
+    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBufferAndOrientation(buffer, orientation);
+    // Original is 1 byte per element, 4 elements (RGBA_8888)
+    size_t numInElements = res.len;
+    size_t numPixels = numInElements/4;
+    
+    size_t numOutElements = numPixels * 3;
+    UInt8 *outBytes = (UInt8 *)malloc(numOutElements);
+    for(int i = 0; i < numPixels; i++) {
+        UInt32 rgba32 = res.ptr[i];
+//        if(i % 360 == 0) {
+//            // I feel like I'm not getting something here. seems like I need to bitshift 24 to get alpha
+//            // But it's RGBA ?? Why's alpha at the far left?
+//            // According to https://stackoverflow.com/a/23304474/4469172
+//            // "Little endian by definition stores the bytes of a number in reverse order"
+//            // So... RGBA is stored as ABGR?
+//            printf("{%d(%d)}", i, (UInt8)((rgba32 >> 24) & 0b11111111)); // alpha should always be 255 right?
+//        }
+        
+        // So... RGBA is stored as ABGR in little endian?
+        // B = bitshift out G and R and cast out the rest
+        outBytes[i * 3] = (UInt8)((rgba32 >> 16) & 0b11111111);
+        // G : ditto
+        outBytes[i * 3 + 1] = (UInt8)((rgba32 >> 8) & 0b11111111);
+        // R : ditto
+        outBytes[i * 3 + 2] = (UInt8)((rgba32) & 0b11111111);
+//        if(i % 360 == 0) { // read value every third of 1080 frame
+//            printf(",%d:(%d, %d, %d)", i, outBytes[i*3 + 2], outBytes[i*3 + 1], outBytes[i*3]);
+//        }
+        // OK. Values seem to be correct in ordering now.
+    }
+    free(res.ptr);
+    return (UInt8MallocatedPointerStruct) {
+        .ptr = outBytes,
+        .len = numOutElements
+    };
+}
+SKRNNativeVideo::UInt8MallocatedPointerStruct RawRGB24DataFromCMSampleBufferAndOrientation
+(
+ CMSampleBufferRef buffer, UIImageOrientation orientation
+ ) {
+    // Ditto with BGR24 implementation
+    UInt32MallocatedPointerStruct res = RawRGBA32DataFromCMSampleBufferAndOrientation(buffer, orientation);
+    // Original is 1 byte per element, 4 elements (RGBA_8888)
+    size_t numInElements = res.len;
+    size_t numPixels = numInElements/4;
+    
+    size_t numOutElements = numPixels * 3;
+    UInt8 *outBytes = (UInt8 *)malloc(numOutElements);
+    for(int i = 0; i < numPixels; i++) {
+        UInt32 rgba32 = res.ptr[i];
+        // So... RGBA is stored as ABGR in little endian..
+        // I suppose this means RGB = out BGR?
+        // B = bitshift out G and R and cast out the rest
+        outBytes[i * 3] = (UInt8)((rgba32) & 0b11111111);
+        // G : ditto
+        outBytes[i * 3 + 1] = (UInt8)((rgba32 >> 8) & 0b11111111);
+        // R : ditto
+        outBytes[i * 3 + 2] = (UInt8)((rgba32 >> 16) & 0b11111111);
+//        if(i % 360 == 0) { // read value every third of 1080 frame
+//            printf(",%d:(%d, %d, %d)", i, outBytes[i*3 + 2], outBytes[i*3 + 1], outBytes[i*3]);
+//        }
+        // OK. Values seem to be correct in ordering now.
+    }
+    free(res.ptr);
+    return (UInt8MallocatedPointerStruct) {
+        .ptr = outBytes,
+        .len = numOutElements
+    };
+
+}
+
+UInt8MallocatedPointerStruct RawBGR24DataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    return RawBGR24DataFromCMSampleBufferAndOrientation(buffer, UIImageOrientationUp);
+}
+
 
 Float32MallocatedPointerStruct RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
     Float32 maxChannelValueScale = 1/255.0;
@@ -359,9 +468,12 @@ Float32MallocatedPointerStruct RawFloat32RGBAScaledDataFromDataFromCMSampleBuffe
     };
 }
 
-UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+SKRNNativeVideo::UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBufferAndOrientation(CMSampleBufferRef buffer, UIImageOrientation orientation) {
     CVImageBufferRef _imageBuffer = CMSampleBufferGetImageBuffer(buffer);
     CIImage *image = [CIImage imageWithCVPixelBuffer:_imageBuffer];
+    if(orientation != UIImageOrientationUp) {
+        image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
+    }
     CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
     CIContext *context = [CIContext contextWithOptions:@{
         kCIContextOutputColorSpace: (__bridge id)rgbColorSpace,
@@ -373,8 +485,13 @@ UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBuffer(CMSampleBufferRef 
     void *outRenderBytes = malloc(dataSize);
     [context render:image toBitmap:outRenderBytes rowBytes:outBytesPerRow bounds:image.extent format:kCIFormatRGBA8 colorSpace:rgbColorSpace];
     CGColorSpaceRelease(rgbColorSpace);
+    
     UInt32MallocatedPointerStruct ret = (UInt32MallocatedPointerStruct){.ptr = (UInt32 *)outRenderBytes, .len = dataSize };
     return ret;
+
+}
+UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBuffer(CMSampleBufferRef buffer) {
+    return RawRGBA32DataFromCMSampleBufferAndOrientation(buffer, UIImageOrientationUp);
 }
 
 Float32MallocatedPointerStruct rawDataFromCMSampleBuffer(CMSampleBufferRef buffer) {
@@ -471,5 +588,41 @@ Float32MallocatedPointerStruct rawDataFromCMSampleBuffer(CMSampleBufferRef buffe
     }
     CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
     Float32MallocatedPointerStruct ret = (Float32MallocatedPointerStruct){.ptr = outBytes, .len = outBytesIndex };
+    return ret;
+}
+
+CMSampleBufferRef CreateCMSampleBufferFromImage(UIImage *_image, UIImageOrientation orientation) {
+    CIImage *image = [CIImage imageWithCGImage:_image.CGImage];
+    if(orientation != UIImageOrientationUp) {
+        image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
+    }
+    CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    CIContext *context = [CIContext contextWithOptions:@{
+        kCIContextOutputColorSpace: (__bridge id)rgbColorSpace,
+        kCIContextUseSoftwareRenderer:@(NO)
+    }];
+    
+    size_t outBytesPerRow = 4 * image.extent.size.width;
+    size_t dataSize = outBytesPerRow * image.extent.size.height;
+    void *outRenderBytes = malloc(dataSize);
+    [context render:image toBitmap:outRenderBytes rowBytes:outBytesPerRow bounds:image.extent format:kCIFormatRGBA8 colorSpace:rgbColorSpace];
+    CVPixelBufferRef pixelBuffer;
+    // We assign the outRenderBytes to the pixelBuffer, and it gets freed via CVPixelBufferReleaseSimpleFreeMallocedBytesCallback later.
+    CVPixelBufferCreateWithBytes(NULL, image.extent.size.width, image.extent.size.height, kCVPixelFormatType_32RGBA, outRenderBytes, image.extent.size.width * 4, CVPixelBufferReleaseSimpleFreeMallocedBytesCallback, NULL, NULL, &pixelBuffer);
+    CGColorSpaceRelease(rgbColorSpace);
+    
+    CMVideoFormatDescriptionRef videoInfo = NULL;
+    CMVideoFormatDescriptionCreateForImageBuffer(NULL, pixelBuffer, &videoInfo);
+    CMTime frameTime = CMTimeMake(1, 60);
+    CMSampleTimingInfo timing = {frameTime, frameTime, kCMTimeInvalid};
+    
+    CMSampleBufferRef ret = NULL;
+    OSStatus ok = CMSampleBufferCreateReadyWithImageBuffer(NULL, pixelBuffer, videoInfo, &timing, &ret);
+    if(ok != 0) {
+        NSLog(@"error creating sample buffer %d", ok);
+    }
+    
+    CFRelease(pixelBuffer);
+    CFRelease(videoInfo);
     return ret;
 }

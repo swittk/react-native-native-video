@@ -30,12 +30,23 @@ export default function App() {
     Alert.alert(`Opened video`, `Video props are duration : ${video.duration}, frameRate: ${video.frameRate}, numFrames ${video.numFrames}, size ${video.size}`);
     setNumFrames(video.numFrames);
   }
-  React.useEffect(()=>{
-    if(!frame) return;
-    const arrBuf = frame.arrayBuffer();
-    const fArr = new Float32Array(arrBuf);
-    console.log('frame arraybuf is', fArr.slice(0, 3).map((v)=>Number(v)));
-    console.log('frame arraybuf len', fArr.length);
+  React.useEffect(() => {
+    if (!frame) return;
+    // const arrBuf = frame.arrayBuffer();
+    // const fArr = new Uint8Array(arrBuf);
+    // console.log('frame arraybuf is', fArr.slice(0, 8).map((v)=>Number(v)));
+    // console.log('frame arraybuf len', fArr.length);
+    // fetch('http://10.146.6.56:44411/post_file', {
+    //   headers: {
+    //     entryname: 'switty',
+    //     filename: 'test.raw',
+    //     username: 'switt',
+    //     'Content-Type': 'application/octet-stream'
+    //   },
+    //   method: 'POST',
+    //   body: fArr,
+    // }).then(() => { console.log('posed arraybuf'); });
+    // console.log('frame md5 is', frame.md5());
   }, [frame]);
 
   const onVideoFrameTest = async () => {

@@ -1,3 +1,27 @@
+import java.nio.file.Paths
+
+static def findNodeModules(baseDir) {
+  def basePath = baseDir.toPath().normalize()
+  // Node's module resolution algorithm searches up to the root directory,
+  // after which the base path will be null
+  while (basePath) {
+    def nodeModulesPath = Paths.get(basePath.toString(), "node_modules")
+    def reactNativePath = Paths.get(nodeModulesPath.toString(), "react-native")
+    if (nodeModulesPath.toFile().exists() && reactNativePath.toFile().exists()) {
+      return nodeModulesPath.toString()
+    }
+    basePath = basePath.getParent()
+  }
+  throw new GradleException("SKRNMLKitFaceDetection: Failed to find node_modules/ path!")
+}
+
+def nodeModules = findNodeModules(projectDir)
+
+def reactProperties = new Properties()
+file("$nodeModules/react-native/ReactAndroid/gradle.properties").withInputStream { reactProperties.load(it) }
+def REACT_NATIVE_VERSION = reactProperties.getProperty("VERSION_NAME").split("\\.")[1].toInteger()
+
+
 buildscript {
     if (project == rootProject) {
         repositories {
@@ -30,6 +54,10 @@ android {
             cmake {
                 cppFlags "-O2 -frtti -fexceptions -Wall -fstack-protector-all"
                 abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+                // This is how the NODE_MODULES_DIR magic variable appears in our CMAKELISTS file
+                arguments "-DNODE_MODULES_DIR=${nodeModules}",
+                  // This is how the REACT_NATIVE_VERSION magic variable appears in our CMAKELISTS file
+                  "-DREACT_NATIVE_VERSION=${REACT_NATIVE_VERSION}"
             }
         }
 
@@ -53,7 +81,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-  ndkVersion "23.1.7779620"
 }
 
 repositories {

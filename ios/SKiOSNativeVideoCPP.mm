@@ -297,8 +297,14 @@ SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime
     setValid(true);
 }
 facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue() {
+    // TODO: allow specifying output formats
     //    jsi::ArrayBuffer
-    Float32MallocatedPointerStruct ret = RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(buffer);
+//    Float32MallocatedPointerStruct ret = RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(buffer);
+//    if(ret.ptr == NULL) {
+//        NSLog(@"rawDataPtr is NULL");
+//        return facebook::jsi::Value::undefined();
+//    }
+    UInt32MallocatedPointerStruct ret = RawRGBA32DataFromCMSampleBufferAndOrientation(buffer, orientation);
     if(ret.ptr == NULL) {
         NSLog(@"rawDataPtr is NULL");
         return facebook::jsi::Value::undefined();
@@ -375,16 +381,18 @@ static std::string md5ForNSData(NSData *data) {
 
 std::string SKiOSNativeFrameWrapper::md5() {
     if(!buffer) return std::string();
-    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
-    CFRetain(buf);
-    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
-    image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
-    //    size_t width = CVPixelBufferGetWidth(buf);
-    //    size_t height = CVPixelBufferGetHeight(buf);
-    UIImage *uiImage = [UIImage imageWithCIImage:image];
-    NSData *pngData = UIImageJPEGRepresentation(uiImage, 1);
-    std::string ret = md5ForNSData(pngData);
-    CFRelease(buf);
+    NSData *data = RawRGBA32NSDataFromCMSampleBuffer(buffer, orientation);
+    std::string ret = md5ForNSData(data);
+//    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
+//    CFRetain(buf);
+//    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
+//    image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
+//    //    size_t width = CVPixelBufferGetWidth(buf);
+//    //    size_t height = CVPixelBufferGetHeight(buf);
+//    UIImage *uiImage = [UIImage imageWithCIImage:image];
+//    NSData *pngData = UIImageJPEGRepresentation(uiImage, 1);
+//    std::string ret = md5ForNSData(pngData);
+//    CFRelease(buf);
     return ret;
 }
 

@@ -23,6 +23,11 @@ typedef struct UInt32MallocatedPointerStruct {
     size_t len;
 } UInt32MallocatedPointerStruct;
 
+typedef struct UInt8MallocatedPointerStruct {
+    UInt8 *ptr;
+    size_t len;
+} UInt8MallocatedPointerStruct;
+
 }
 
 CFDictionaryRef SKRN_GetCVPixelBufferAttributesForGlCompatibility();
@@ -43,11 +48,29 @@ CVPixelBufferRef SKRN_convertPixelBufferToPixelFormat(CVPixelBufferRef input, OS
 
 SKRNNativeVideo::Float32MallocatedPointerStruct rawDataFromCMSampleBuffer(CMSampleBufferRef buffer);
 
+// This is the core method
+SKRNNativeVideo::UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBufferAndOrientation(CMSampleBufferRef buffer, UIImageOrientation orientation);
 SKRNNativeVideo::UInt32MallocatedPointerStruct RawRGBA32DataFromCMSampleBuffer(CMSampleBufferRef buffer);
-NSData *RawRGBA32NSDataFromCMSampleBuffer(CMSampleBufferRef buffer);
+SKRNNativeVideo::UInt8MallocatedPointerStruct RawBGR24DataFromCMSampleBuffer(CMSampleBufferRef buffer);
+
+SKRNNativeVideo::UInt8MallocatedPointerStruct RawBGR24DataFromCMSampleBufferAndOrientation
+(
+ CMSampleBufferRef buffer, UIImageOrientation orientation
+ );
+SKRNNativeVideo::UInt8MallocatedPointerStruct RawRGB24DataFromCMSampleBufferAndOrientation
+(
+ CMSampleBufferRef buffer, UIImageOrientation orientation
+ );
+
+
+NSData *RawRGBA32NSDataFromCMSampleBuffer(CMSampleBufferRef buffer, UIImageOrientation orientation);
+NSData *RawBGR24NSDataFromCMSampleBuffer(CMSampleBufferRef buffer, UIImageOrientation orientation);
+NSData *RawRGB24NSDataFromCMSampleBuffer(CMSampleBufferRef buffer, UIImageOrientation orientation);
 
 SKRNNativeVideo::Float32MallocatedPointerStruct RawFloat32RGBAScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer);
 NSData *RawFloat32RGBAScaledNSDataFromCMSampleBuffer(CMSampleBufferRef buffer);
 
 SKRNNativeVideo::Float32MallocatedPointerStruct RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(CMSampleBufferRef buffer);
+
+CMSampleBufferRef CreateCMSampleBufferFromImage(UIImage *image, UIImageOrientation orientation);
 #endif /* iOSVideoUtils_hpp */
