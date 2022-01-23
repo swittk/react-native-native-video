@@ -12,10 +12,11 @@ static def findNodeModules(baseDir) {
     }
     basePath = basePath.getParent()
   }
-  throw new GradleException("SKRNMLKitFaceDetection: Failed to find node_modules/ path!")
+  throw new GradleException("ReactNativeNativeVideo: Failed to find node_modules/ path!")
 }
 
 def nodeModules = findNodeModules(projectDir)
+logger.warn("ReactNativeNativeVideo: node_modules/ found at: ${nodeModules}")
 
 def reactProperties = new Properties()
 file("$nodeModules/react-native/ReactAndroid/gradle.properties").withInputStream { reactProperties.load(it) }
@@ -55,7 +56,7 @@ android {
                 cppFlags "-O2 -frtti -fexceptions -Wall -fstack-protector-all"
                 abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
                 // This is how the NODE_MODULES_DIR magic variable appears in our CMAKELISTS file
-                arguments "-DNODE_MODULES_DIR=${nodeModules}",
+                arguments "-DNODE_MODULES_DIR=${nodeModules.toString()}",
                   // This is how the REACT_NATIVE_VERSION magic variable appears in our CMAKELISTS file
                   "-DREACT_NATIVE_VERSION=${REACT_NATIVE_VERSION}"
             }

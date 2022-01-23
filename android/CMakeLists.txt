@@ -6,6 +6,8 @@ set (CMAKE_CXX_STANDARD 14)
 set (RN_SO_DIR ${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/first-party/react/jni)
 set (FBJNI_HEADERS_DIR ${RN_SO_DIR}/../../fbjni/headers)
 
+message(STATUS "NODE_MODULES_DIR of React-Native-Native-Video CMAKE is ${NODE_MODULES_DIR}")
+
 # REACT_NATIVE_VERSION is set from the build.gradle file
 if(${REACT_NATIVE_VERSION} LESS 66)
 set (
@@ -37,7 +39,7 @@ include_directories(
             .
             "${FBJNI_HEADERS_DIR}"
             "${NODE_MODULES_DIR}/react-native/React"
-            "${NODE_MODULES_DIR}/node_modules/react-native/React/Base"
+            "${NODE_MODULES_DIR}/react-native/React/Base"
             "${NODE_MODULES_DIR}/react-native/ReactCommon"
             "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi"
             "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
