@@ -34,6 +34,8 @@ public class SKNativeVideoWrapperJavaSide {
     // Android noob following this answer https://stackoverflow.com/a/45833710/4469172
     mediaRetriever = new MediaMetadataRetriever();
     mediaRetriever.setDataSource(path);
+    // Call getNumFrames once because it is needed for frame retrieval.
+    getNumFrames();
   }
 
   // Following here https://stackoverflow.com/a/9224180/4469172
@@ -55,6 +57,8 @@ public class SKNativeVideoWrapperJavaSide {
 
   @RequiresApi(api = Build.VERSION_CODES.P)
   Bitmap getFrameAtIndex(int index) {
+    if(index < 0) index = 0;
+    else if(index > numFrames - 1) index = numFrames - 1;
     return mediaRetriever.getFrameAtIndex(index);
   }
 
@@ -65,6 +69,11 @@ public class SKNativeVideoWrapperJavaSide {
 
   @RequiresApi(api = Build.VERSION_CODES.P)
   List<Bitmap> getFramesAtIndex(int index, int len) {
+    if(index < 0) index = 0;
+    else if(index > numFrames - 1) index = numFrames - 1;
+    if(index + len > numFrames - 1) {
+      len = (numFrames - 1) - index;
+    }
     return mediaRetriever.getFramesAtIndex(index, len);
   }
 

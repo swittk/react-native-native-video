@@ -42,9 +42,17 @@ apply plugin: 'com.android.library'
 def safeExtGet(prop, fallback) {
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
+def getExtOrDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['VisionCamera_' + name]
+}
+def getExtOrDefaultValue(name, defaultValue) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : defaultValue
+}
+
 
 android {
     compileSdkVersion safeExtGet('NativeVideo_compileSdkVersion', 29)
+    ndkVersion getExtOrDefaultValue('ndkVersion', '21.4.7075529')
     defaultConfig {
         minSdkVersion safeExtGet('NativeVideo_minSdkVersion', 16)
         targetSdkVersion safeExtGet('NativeVideo_targetSdkVersion', 29)
@@ -88,7 +96,7 @@ repositories {
     mavenLocal()
     maven {
         // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-        url("$rootDir/../node_modules/react-native/android")
+        url("$nodeModules/react-native/android")
     }
     google()
     mavenCentral()
