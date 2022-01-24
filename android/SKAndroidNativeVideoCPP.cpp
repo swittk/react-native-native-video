@@ -2,40 +2,33 @@
 // Created by Switt Kongdachalert on 5/1/2022 AD.
 //
 
-/*
- * Tips to self :
- * JVM's AttachCurrentThread MUST be balanced with a DetachCurrentThread or I'll get headaches like
- * spending all day of 05/01/2022 on (memory access to NULL, EACCESS, etc.).
- * See similar issue : https://stackoverflow.com/a/26534926/4469172
- *
- */
-
 #include "SKAndroidNativeVideoCPP.h"
 #include <jni.h>
 
-jclass NativeVideoWrapperJavaSideClass = 0;
-jmethodID NativeVideoWrapperJavaGetFrameAtIndexMethod = 0;
-jmethodID NativeVideoWrapperJavaGetFramesAtIndexMethod = 0;
-jmethodID NativeVideoWrapperJavaGetFrameAtTimeMethod = 0;
-jmethodID NativeVideoWrapperJavaGetNumFramesMethod = 0;
-jmethodID NativeVideoWrapperJavaGetFrameRateMethod = 0;
-jmethodID NativeVideoWrapperJavaGetDurationMethod = 0;
-jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
-jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
-jmethodID NativeVideoWrapperJavaSideClassConstructor = 0;
-jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod = 0;
-
-jmethodID BitmapGetWidthMethod = 0;
-jmethodID BitmapGetHeightMethod = 0;
-jclass BitmapClassRef = 0;
-
-jclass java_util_List;
-jmethodID java_util_List_;
-jmethodID java_util_List_size;
-jmethodID java_util_List_get;
-jmethodID java_util_List_add;
-
 using namespace SKRNNativeVideo;
+namespace SKRNNativeVideo {
+    jclass NativeVideoWrapperJavaSideClass = 0;
+    jmethodID NativeVideoWrapperJavaGetFrameAtIndexMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetFramesAtIndexMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetFrameAtTimeMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetNumFramesMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetFrameRateMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetDurationMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
+    jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
+    jmethodID NativeVideoWrapperJavaSideClassConstructor = 0;
+    jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod = 0;
+
+    jmethodID BitmapGetWidthMethod = 0;
+    jmethodID BitmapGetHeightMethod = 0;
+    jclass BitmapClassRef = 0;
+
+    jclass java_util_List;
+    jmethodID java_util_List_;
+    jmethodID java_util_List_size;
+    jmethodID java_util_List_get;
+    jmethodID java_util_List_add;
+}
 
 static std::string jstring2string(JNIEnv *env, jstring jStr);
 
@@ -237,44 +230,4 @@ static std::string jstring2string(JNIEnv *env, jstring jStr) {
     env->DeleteLocalRef(stringJbytes);
     env->DeleteLocalRef(stringClass);
     return ret;
-}
-
-// Following this great example here
-// https://github.com/rdixonbhw/ReactNative-JNI-Blog/blob/master/android/app/src/main/jni/hello_world.c
-// Which can be cross-referenced here https://thebhwgroup.com/blog/react-native-jni
-extern "C"
-jint JNI_OnLoad(JavaVM *vm, void *reserved) {
-    JNIEnv *env;
-    if(vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
-        return -1;
-    }
-    java_util_List      = static_cast<jclass>(env->NewGlobalRef(env->FindClass("java/util/List")));
-    java_util_List_     = env->GetMethodID(java_util_List, "<init>", "()V");
-    java_util_List_size = env->GetMethodID (java_util_List, "size", "()I");
-    java_util_List_get  = env->GetMethodID(java_util_List, "get", "(I)Ljava/lang/Object;");
-    java_util_List_add  = env->GetMethodID(java_util_List, "add", "(Ljava/lang/Object;)Z");
-
-    jclass SKNativeVideoCLS = (jclass)env->NewGlobalRef(env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide"));
-    NativeVideoWrapperJavaSideClass = SKNativeVideoCLS;
-    NativeVideoWrapperJavaGetDurationMethod = env->GetMethodID(SKNativeVideoCLS, "getDuration", "()D");
-    NativeVideoWrapperJavaGetFrameRateMethod = env->GetMethodID(SKNativeVideoCLS, "getFrameRate", "()D");
-    NativeVideoWrapperJavaGetWidthMethod = env->GetMethodID(SKNativeVideoCLS, "getWidth","()I");
-    NativeVideoWrapperJavaGetNumFramesMethod = env->GetMethodID(SKNativeVideoCLS, "getNumFrames","()I");
-    NativeVideoWrapperJavaGetFrameAtIndexMethod = env->GetMethodID(SKNativeVideoCLS, "getFrameAtIndex",
-                                                                   "(I)Landroid/graphics/Bitmap;");
-    NativeVideoWrapperJavaGetFramesAtIndexMethod = env->GetMethodID(SKNativeVideoCLS, "getFramesAtIndex",
-                                                                    "(II)Ljava/util/List;");
-    NativeVideoWrapperJavaGetFrameAtTimeMethod = env->GetMethodID(SKNativeVideoCLS, "getFrameAtTime",
-                                                                  "(D)Landroid/graphics/Bitmap;");
-    NativeVideoWrapperJavaGetHeightMethod = env->GetMethodID(SKNativeVideoCLS, "getHeight",
-                                                             "()I");
-    NativeVideoWrapperJavaSideClassConstructor = env->GetMethodID(SKNativeVideoCLS, "<init>",
-                                                                  "(Ljava/lang/String;)V");
-    NativeVideoWrapperJavaSideBase64ForBitmapMethod = env->GetStaticMethodID(SKNativeVideoCLS, "Base64StringForBitmap", "(Landroid/graphics/Bitmap;Ljava/lang/String;)Ljava/lang/String;");
-
-    BitmapClassRef = (jclass)env->NewGlobalRef(env->FindClass("android/graphics/Bitmap"));
-    BitmapGetWidthMethod = env->GetMethodID(BitmapClassRef, "getWidth", "()I");
-    BitmapGetHeightMethod = env->GetMethodID(BitmapClassRef, "getHeight", "()I");
-
-    return JNI_VERSION_1_6;
 }

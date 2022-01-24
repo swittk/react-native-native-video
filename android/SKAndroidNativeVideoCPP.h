@@ -8,6 +8,28 @@
 #define ANDROID_SKANDROIDNATIVEVIDEOCPP_H
 
 namespace SKRNNativeVideo {
+    extern jclass NativeVideoWrapperJavaSideClass;
+    extern jmethodID NativeVideoWrapperJavaGetFrameAtIndexMethod;
+    extern jmethodID NativeVideoWrapperJavaGetFramesAtIndexMethod;
+    extern jmethodID NativeVideoWrapperJavaGetFrameAtTimeMethod;
+    extern jmethodID NativeVideoWrapperJavaGetNumFramesMethod;
+    extern jmethodID NativeVideoWrapperJavaGetFrameRateMethod;
+    extern jmethodID NativeVideoWrapperJavaGetDurationMethod;
+    extern jmethodID NativeVideoWrapperJavaGetWidthMethod;
+    extern jmethodID NativeVideoWrapperJavaGetHeightMethod;
+    extern jmethodID NativeVideoWrapperJavaSideClassConstructor;
+    extern jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod;
+
+    extern jmethodID BitmapGetWidthMethod;
+    extern jmethodID BitmapGetHeightMethod;
+    extern jclass BitmapClassRef;
+
+    extern jclass java_util_List;
+    extern jmethodID java_util_List_;
+    extern jmethodID java_util_List_size;
+    extern jmethodID java_util_List_get;
+    extern jmethodID java_util_List_add;
+
     class SKAndroidNativeFrameWrapper : public SKNativeFrameWrapper {
     public:
         JavaVM *jvm;

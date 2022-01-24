@@ -31,6 +31,7 @@ add_library(${PACKAGE_NAME}
             ../cpp/react-native-native-video.cpp
             cpp-adapter.cpp
             SKAndroidNativeVideoCPP.cpp
+            SKAndroidNativeVideoCPPOnLoad.cpp
 )
 
 # Specifies a path to native header files.
