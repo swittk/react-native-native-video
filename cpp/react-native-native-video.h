@@ -55,6 +55,7 @@ public:
     // This should free/close native resources
     virtual void close() {};
     // Supposed to return ArrayBuffer
+    // TODO: Make it so we're able to specify formats! (currently only RGBA32 (8 bytes per channel))
     virtual facebook::jsi::Value arrayBufferValue(facebook::jsi::Runtime &runtime) { return facebook::jsi::Value::undefined(); }
     virtual SKRNSize size() {return (SKRNSize){0, 0};}
     virtual std::string base64(std::string format = "") {return std::string();}

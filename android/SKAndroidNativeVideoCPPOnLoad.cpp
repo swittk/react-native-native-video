@@ -15,6 +15,7 @@ namespace SKRNNativeVideo {
     extern jmethodID NativeVideoWrapperJavaGetHeightMethod;
     extern jmethodID NativeVideoWrapperJavaSideClassConstructor;
     extern jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod;
+    extern jmethodID NativeVideoWrapperJavaSideRGBABytesForBitmapMethod;
 
     extern jmethodID BitmapGetWidthMethod;
     extern jmethodID BitmapGetHeightMethod;
@@ -63,6 +64,8 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     NativeVideoWrapperJavaSideClassConstructor = env->GetMethodID(SKNativeVideoCLS, "<init>",
                                                                   "(Ljava/lang/String;)V");
     NativeVideoWrapperJavaSideBase64ForBitmapMethod = env->GetStaticMethodID(SKNativeVideoCLS, "Base64StringForBitmap", "(Landroid/graphics/Bitmap;Ljava/lang/String;)Ljava/lang/String;");
+
+    NativeVideoWrapperJavaSideRGBABytesForBitmapMethod = env->GetStaticMethodID(SKNativeVideoCLS, "rgbaValuesFromBitmap", "(Landroid/graphics/Bitmap;)[B");
 
     BitmapClassRef = (jclass)env->NewGlobalRef(env->FindClass("android/graphics/Bitmap"));
     BitmapGetWidthMethod = env->GetMethodID(BitmapClassRef, "getWidth", "()I");

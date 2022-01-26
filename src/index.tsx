@@ -27,6 +27,10 @@ export function openVideo(url: string): NativeVideoWrapper {
 }
 
 export interface NativeFrameWrapper {
+  /**
+   * Returns RGBA32 (8 bytes per pixel) UInt8 data.
+   * TODO: Allow other formats to be specified
+   */
   arrayBuffer(): ArrayBuffer;
   size: { width: number, height: number };
   isValid: boolean;

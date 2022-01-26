@@ -59,8 +59,10 @@ export default function App() {
     video = video!; // Make typescript not complain.
     const frame = video.getFrameAtIndex(frameIdx);
     console.log(`Video frame is${JSON.stringify(frame)}`);
-    // const arrayBuffer = frame.arrayBuffer;
-    // console.log('arrayBuffer status', arrayBuffer);
+    const arrayBuffer = frame.arrayBuffer();
+    // console.log('arrayBuffer status', arrayBuffer.byteLength);
+    const arrBufView = new Uint8Array(arrayBuffer);
+    console.log('first 8 arraybuffer data', arrBufView.slice(0, 8));
     setFrame(frame);
   }
   const onTryBase64 = () => {

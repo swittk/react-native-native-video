@@ -23,7 +23,7 @@ Java_com_reactnativenativevideo_NativeVideoModule_initialize(JNIEnv *env, jclass
             [&, jvm](facebook::jsi::Runtime &runtime,
                std::string path) -> std::shared_ptr<SKNativeVideoWrapper> {
                 std::shared_ptr<SKNativeVideoWrapper> ret = std::make_shared<SKAndroidNativeVideoWrapper>(
-                        runtime, path, jvm);
+                        path, jvm);
                 return ret;
             }
     );

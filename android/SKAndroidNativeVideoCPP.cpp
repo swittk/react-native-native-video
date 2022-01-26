@@ -17,7 +17,8 @@ namespace SKRNNativeVideo {
     jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
     jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
     jmethodID NativeVideoWrapperJavaSideClassConstructor = 0;
-    jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod = 0;
+    jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod = 0; // Static
+    jmethodID NativeVideoWrapperJavaSideRGBABytesForBitmapMethod = 0; // Static
 
     jmethodID BitmapGetWidthMethod = 0;
     jmethodID BitmapGetHeightMethod = 0;
@@ -32,12 +33,25 @@ namespace SKRNNativeVideo {
 
 static std::string jstring2string(JNIEnv *env, jstring jStr);
 
+// Adapted from here https://stackoverflow.com/a/16668081/4469172
+// Don't forget to free()!
+static unsigned char* jbyteArray_createUnsignedCharArray(JNIEnv *env, jbyteArray array) {
+    int len = env->GetArrayLength (array);
+    unsigned char* buf = (unsigned char *)malloc(len);
+    env->GetByteArrayRegion (array, 0, len, reinterpret_cast<jbyte*>(buf));
+    return buf;
+}
+static jbyteArray jbyteArray_createFromByteArray(JNIEnv *env, unsigned char* buf, int len) {
+    jbyteArray array = env->NewByteArray (len);
+    env->SetByteArrayRegion (array, 0, len, reinterpret_cast<jbyte*>(buf));
+    return array;
+}
+
 // TODO: I have no idea if JNIEnv * is safe to be stored in classes; if anyone knows better please make pull requests or something
 SKAndroidNativeVideoWrapper::SKAndroidNativeVideoWrapper(
-        facebook::jsi::Runtime &runtime,
         std::string sourceUri,
         JavaVM* _vm
-) : SKNativeVideoWrapper(runtime, sourceUri), jvm(_vm) {
+) : SKNativeVideoWrapper(sourceUri), jvm(_vm) {
     printf("about to init listHelper");
     printf("about to get jnienv");
     JNIEnv *env = getJNIEnv();
@@ -77,7 +91,7 @@ SKAndroidNativeVideoWrapper::getFrameAtIndex(int index) {
     // According to https://stackoverflow.com/a/2093300/4469172, I should not reuse jclass, but `jmethodID`s are reusable.
     jobject bitmap = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameAtIndexMethod, index);
     clearJNIEnv();
-    return std::make_shared<SKAndroidNativeFrameWrapper>(runtime, jvm, bitmap);
+    return std::make_shared<SKAndroidNativeFrameWrapper>(jvm, bitmap);
 };
 
 std::vector<std::shared_ptr<SKNativeFrameWrapper>>
@@ -89,7 +103,7 @@ SKAndroidNativeVideoWrapper::getFramesAtIndex(int index, int len) {
     jobject listObj = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFramesAtIndexMethod, index, len);
     std::vector<jobject> bitmaps = javaList2vector_jobjects(env, listObj);
     for(jobject bitmap : bitmaps) {
-        ret.push_back(std::make_shared<SKAndroidNativeFrameWrapper>(runtime, jvm, bitmap));
+        ret.push_back(std::make_shared<SKAndroidNativeFrameWrapper>(jvm, bitmap));
     }
     clearJNIEnv();
     return ret;
@@ -99,7 +113,7 @@ SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
     JNIEnv *env = getJNIEnv();
     jobject bitmap = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameAtTimeMethod, time);
     clearJNIEnv();
-    return std::make_shared<SKAndroidNativeFrameWrapper>(runtime, jvm, bitmap);
+    return std::make_shared<SKAndroidNativeFrameWrapper>(jvm, bitmap);
 };
  int SKAndroidNativeVideoWrapper::numFrames() {
      JNIEnv *env = getJNIEnv();
@@ -151,8 +165,8 @@ std::vector<jobject> SKAndroidNativeVideoWrapper::javaList2vector_jobjects(JNIEn
 
 #pragma mark - FrameWrapper methods
 
-SKAndroidNativeFrameWrapper::SKAndroidNativeFrameWrapper(facebook::jsi::Runtime &_runtime, JavaVM *_vm, jobject _bitmap) :
-SKNativeFrameWrapper(_runtime), jvm(_vm)
+SKAndroidNativeFrameWrapper::SKAndroidNativeFrameWrapper(JavaVM *_vm, jobject _bitmap) :
+SKNativeFrameWrapper(), jvm(_vm)
 {
      JNIEnv *env = getJNIEnv();
     if(_bitmap == NULL) {
@@ -198,6 +212,22 @@ std::string SKAndroidNativeFrameWrapper::base64(std::string format) {
     jstring retStr = (jstring)env->CallStaticObjectMethod(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideBase64ForBitmapMethod, bitmap, env->NewStringUTF(format.c_str()));
     return std::string(env->GetStringUTFChars(retStr, 0));
 }
+
+facebook::jsi::Value SKAndroidNativeFrameWrapper::arrayBufferValue(facebook::jsi::Runtime &runtime) {
+     using namespace facebook;
+     JNIEnv *env = getJNIEnv();
+    jbyteArray arr = (jbyteArray)env->CallStaticObjectMethod(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideRGBABytesForBitmapMethod, bitmap);
+    int len = env->GetArrayLength(arr);
+    unsigned char *bytes = jbyteArray_createUnsignedCharArray(env, arr);
+    jsi::Function arrayBufferCtor = runtime.global().getPropertyAsFunction(runtime, "ArrayBuffer");
+    size_t totalBytes = len;
+    jsi::Object o = arrayBufferCtor.callAsConstructor(runtime, jsi::Value((int)totalBytes)).getObject(runtime);
+    jsi::ArrayBuffer buf = o.getArrayBuffer(runtime);
+    memcpy(buf.data(runtime), bytes, totalBytes);
+    free(bytes);
+    return std::move(o);
+ }
+
 
 
 extern "C"
