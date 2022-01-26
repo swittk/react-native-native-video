@@ -11,7 +11,7 @@ using namespace jsi;
 
 namespace SKRNNativeVideo {
 
-SKNativeVideoWrapper::SKNativeVideoWrapper(facebook::jsi::Runtime &rt, std::string uri): runtime(rt), sourceUri(uri) {}
+SKNativeVideoWrapper::SKNativeVideoWrapper(std::string uri): sourceUri(uri) {}
 jsi::Value SKNativeVideoWrapper::get(jsi::Runtime &runtime, const jsi::PropNameID &name) {
     std::string methodName = name.utf8(runtime);
     long long methodSwitch = string_hash(methodName.c_str());
@@ -127,7 +127,7 @@ jsi::Value SKNativeFrameWrapper::get(jsi::Runtime &runtime, const jsi::PropNameI
                                                                                size_t count) -> jsi::Value
                                                          {
                 //                if(count < 1) return jsi::JSError(runtime, "No frame index supplied");
-                return arrayBufferValue();
+                return arrayBufferValue(runtime);
             });
             
             //            printf("ArrayBuffer called with hash %llu when methodSwitch is %llu and method is %s", "arrayBuffer"_sh, methodSwitch, methodName.c_str());

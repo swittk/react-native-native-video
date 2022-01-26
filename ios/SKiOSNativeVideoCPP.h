@@ -27,14 +27,14 @@ public:
     CGAffineTransform transform;
     UIImageOrientation orientation;
     /** This buffer is CFRetained +1 by the wrapper. You are supposed to call CFRelease() on any other dependencies on this buffer yourself.*/
-    SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf, CGAffineTransform transform, UIImageOrientation orientation);
+    SKiOSNativeFrameWrapper(CMSampleBufferRef buf, CGAffineTransform transform, UIImageOrientation orientation);
     ~SKiOSNativeFrameWrapper();
     /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
     virtual std::string platform() { return "iOS"; };
     // This should free/close native resources
     virtual void close();
     // Supposed to return ArrayBuffer
-    virtual facebook::jsi::Value arrayBufferValue();
+    virtual facebook::jsi::Value arrayBufferValue(facebook::jsi::Runtime &runtime);
     virtual SKRNSize size();
     virtual std::string base64(std::string format);
     virtual std::string md5();
@@ -54,7 +54,7 @@ public:
     AVAssetTrack *videoTrack;
     AVAssetReaderTrackOutput *readerOutput;
     SKRNNVRetainChecker *checker;
-    SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri);
+    SKiOSNativeVideoWrapper(std::string sourceUri);
     ~SKiOSNativeVideoWrapper();
     virtual void close();
     virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index);

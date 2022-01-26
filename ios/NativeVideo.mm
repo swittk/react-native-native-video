@@ -66,7 +66,7 @@ RCT_EXPORT_METHOD(multiply:(nonnull NSNumber*)a withB:(nonnull NSNumber*)b
     }
     facebook::jsi::Runtime *runtime = (facebook::jsi::Runtime *)cxxBridge.runtime;
     install(*runtime, [](facebook::jsi::Runtime& runtime, std::string path) -> std::shared_ptr<SKNativeVideoWrapper> {
-        std::shared_ptr<SKNativeVideoWrapper>ret =  std::make_shared<SKiOSNativeVideoWrapper>(runtime, path);
+        std::shared_ptr<SKNativeVideoWrapper>ret =  std::make_shared<SKiOSNativeVideoWrapper>(path);
         return ret;
     });
 }

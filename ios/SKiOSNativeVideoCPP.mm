@@ -29,7 +29,7 @@ static CGImagePropertyOrientation SKRNNVCGImagePropertyOrientationForUIImageOrie
     }
 }
 
-SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(facebook::jsi::Runtime &runtime, std::string sourceUri) : SKNativeVideoWrapper(runtime, sourceUri)
+SKiOSNativeVideoWrapper::SKiOSNativeVideoWrapper(std::string sourceUri) : SKNativeVideoWrapper(sourceUri)
 {
     // See here https://developer.apple.com/forums/thread/42751 :: Resource for reading CMSampleBufferRef frames from video
     NSString *path = [NSString stringWithUTF8String:sourceUri.c_str()];
@@ -188,7 +188,7 @@ std::shared_ptr<SKNativeFrameWrapper> SKiOSNativeVideoWrapper::getFrameAtIndex(i
     if(buf == NULL) {
         return std::shared_ptr<SKNativeFrameWrapper>(nullptr);
     }
-    std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation);
+    std::shared_ptr<SKiOSNativeFrameWrapper> ret = std::make_shared<SKiOSNativeFrameWrapper>(buf, videoTrack.preferredTransform, orientation);
     CFRelease(buf);
     
     int extraCount = 0;
@@ -238,7 +238,7 @@ std::vector<std::shared_ptr<SKNativeFrameWrapper>> SKiOSNativeVideoWrapper::getF
             // Do nothing
         }
         else {
-            ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(runtime, buf, videoTrack.preferredTransform, orientation));
+            ret.push_back(std::make_shared<SKiOSNativeFrameWrapper>(buf, videoTrack.preferredTransform, orientation));
         }
         // Just release, don't do an oopsie and accidentally invalidate it like last time
         CFRelease(buf);
@@ -291,12 +291,12 @@ void SKiOSNativeVideoWrapper::close() {
 
 #pragma mark - SKiOSNativeFrameWrapper
 
-SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(facebook::jsi::Runtime &runtime, CMSampleBufferRef buf, CGAffineTransform vtransform, UIImageOrientation vorientation) : SKNativeFrameWrapper(runtime), transform(vtransform), orientation(vorientation) {
+SKiOSNativeFrameWrapper::SKiOSNativeFrameWrapper(CMSampleBufferRef buf, CGAffineTransform vtransform, UIImageOrientation vorientation) : SKNativeFrameWrapper(), transform(vtransform), orientation(vorientation) {
     CFRetain(buf);
     buffer = buf;
     setValid(true);
 }
-facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue() {
+facebook::jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue(facebook::jsi::Runtime &runtime) {
     // TODO: allow specifying output formats
     //    jsi::ArrayBuffer
 //    Float32MallocatedPointerStruct ret = RawFloat32RGBScaledDataFromDataFromCMSampleBuffer(buffer);
