@@ -9,14 +9,16 @@
     "start": "react-native start"
   },
   "dependencies": {
-    "@react-native-community/slider": "4.1.12",
-    "expo": "^44.0.3",
-    "expo-image-picker": "^12.0.1",
-    "react": "~17",
-    "react-native": "0.64.3"
+    "@react-native-community/slider": "4.4.2",
+    "expo": "^49.0.22",
+    "expo-image-picker": "~14.3.2",
+    "react": "18.2.0",
+    "react-native": "0.72.10",
+    "expo-splash-screen": "~0.20.5",
+    "expo-status-bar": "~1.6.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.12.10",
+    "@babel/core": "^7.20.0",
     "@babel/runtime": "^7.12.5",
     "babel-plugin-module-resolver": "^4.0.0",
     "metro-react-native-babel-preset": "^0.64.0"

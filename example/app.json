@@ -1,4 +1,10 @@
 {
   "name": "NativeVideoExample",
-  "displayName": "NativeVideo Example"
+  "displayName": "NativeVideo Example",
+  "android": {
+    "package": "com.switt.nativevideoexample"
+  },
+  "ios": {
+    "bundleIdentifier": "com.switt.nativevideoexample"
+  }
 }

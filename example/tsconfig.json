@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "react-native-native-video": ["../src/index"]
+    }
+  },
+  "extends": "expo/tsconfig.base"
+}

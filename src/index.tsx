@@ -39,6 +39,8 @@ export interface NativeFrameWrapper {
   /** Call this to free the frame once it gets unused; call it if memory is very crucial */
   close(): void;
   base64(opts?: { format?: 'png' | 'jpg' }): string;
+  /** (Internal) a string that contains the value to the native pointer */
+  nativePtrStr?: string;
 
   // BETA: MD5 hash of the frame, however, it's not the same across platforms & not the same as in FFMPEG yet
   md5(): string;
@@ -66,8 +68,10 @@ type NativeVideoFrameViewState = {};
 export class NativeVideoFrameView extends React.PureComponent<NativeVideoFrameViewProps, NativeVideoFrameViewState> {
   render() {
     const { frameData, style } = this.props;
+    // console.log('got frameData and style', frameData, style)
     return <SKRNNativeFrameView
-      frameData={frameData}
+      // this shit is because somehow, JSI objects are no longer re-serialized as NSDictionary as before anymore.
+      frameData={{ nativePtrStr: frameData?.nativePtrStr } as any}
       style={style}
     />
   }

@@ -1,4 +1,4 @@
-package com.example.reactnativenativevideo;
+package com.switt.nativevideoexample;
 import expo.modules.ReactActivityDelegateWrapper;
 import com.facebook.react.ReactActivityDelegate;
 

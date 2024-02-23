@@ -15,8 +15,8 @@ export default function App() {
   const onPickVideo = async () => {
     await ImagePicker.getMediaLibraryPermissionsAsync();
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos });
-    if (res.cancelled) return;
-    const uri = res.uri;
+    if (res.canceled) return;
+    const uri = res.assets[0].uri;
     setPickedUri(uri);
   }
   const onVideoProperties = async () => {
@@ -88,6 +88,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
+      <View style={{ height: 44 }} />
       <Button title='Pick Video' onPress={onPickVideo} />
       <TextInput style={{ fontSize: 16, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#888' }} value={goToFrame} onChangeText={setGoToFrame} onEndEditing={() => {
         let num = Number(goToFrame);

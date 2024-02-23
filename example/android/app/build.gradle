@@ -80,7 +80,8 @@ project.ext.react = [
     entryFile: "index.tsx",
 ]
 
-apply from: "../../node_modules/react-native/react.gradle"
+// apply from: new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), "../react.gradle")
+// apply from: "../../node_modules/react-native/react.gradle" // No longer used in 0.72
 
 /**
  * Set this to true to create two separate APKs instead of one:
@@ -128,11 +129,11 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.reactnativenativevideo"
+        applicationId 'com.switt.nativevideoexample'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "0.0.1"
     }
     splits {
         abi {
