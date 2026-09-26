@@ -1,175 +1,151 @@
-//
-//  SKRNNativeFrameViewManager.m
-//  react-native-native-video
-//
-//  Created by Switt Kongdachalert on 4/1/2565 BE.
-//
-
 #import "SKRNNativeFrameViewManager.h"
+
 #import "SKiOSNativeVideoCPP.h"
 #import "react-native-native-video.h"
 
-@interface SKRNNativeFrameView() {
-    UIImageView *imageView;
-}
-@property (readonly) UIImageView *imageView;
-@end
+#include <memory>
+#include <utility>
 
 using namespace SKRNNativeVideo;
-@implementation SKRNNativeFrameViewManager
-RCT_EXPORT_MODULE(SKRNNativeFrameView)
 
-CGImagePropertyOrientation SKRNNVCGImagePropertyOrientationForUIImageOrientation(UIImageOrientation uiOrientation);
+namespace {
+
+CGImagePropertyOrientation CGOrientationForUIImageOrientation(
+    UIImageOrientation orientation) {
+  switch (orientation) {
+    case UIImageOrientationUp:
+      return kCGImagePropertyOrientationUp;
+    case UIImageOrientationDown:
+      return kCGImagePropertyOrientationDown;
+    case UIImageOrientationLeft:
+      return kCGImagePropertyOrientationLeft;
+    case UIImageOrientationRight:
+      return kCGImagePropertyOrientationRight;
+    case UIImageOrientationUpMirrored:
+      return kCGImagePropertyOrientationUpMirrored;
+    case UIImageOrientationDownMirrored:
+      return kCGImagePropertyOrientationDownMirrored;
+    case UIImageOrientationLeftMirrored:
+      return kCGImagePropertyOrientationLeftMirrored;
+    case UIImageOrientationRightMirrored:
+      return kCGImagePropertyOrientationRightMirrored;
+  }
+  return kCGImagePropertyOrientationUp;
+}
+
+} // namespace
+
+@interface SKRNNativeFrameView () {
+  UIImageView *_imageView;
+  std::shared_ptr<SKiOSNativeFrameWrapper> _nativeFrame;
+}
+
+- (void)setNativeFrame:(std::shared_ptr<SKiOSNativeFrameWrapper>)frame;
+- (void)setNativeResizeMode:(NSString *_Nullable)resizeMode;
+
+@end
+
+@implementation SKRNNativeFrameViewManager
+
+RCT_EXPORT_MODULE(SKRNNativeFrameView)
 
 - (SKRNNativeFrameView *)view
 {
-  return [[SKRNNativeFrameView alloc] init];
+  return [[SKRNNativeFrameView alloc] initWithFrame:CGRectZero];
 }
 
-RCT_CUSTOM_VIEW_PROPERTY(resizeMode, NSString *, SKRNNativeFrameView) {
-    if(![json isKindOfClass:[NSString class]]) {
-        NSLog(@"got weird resizeMode");
-        return;
-    }
-    NSString *mode = (NSString *)json;
-    if([mode isEqualToString:@"contain"]) {
-        view.imageView.contentMode = UIViewContentModeScaleAspectFit;
-    }
-    else if([mode isEqualToString:@"cover"]) {
-        view.imageView.contentMode = UIViewContentModeScaleAspectFill;
-    }
-    else if([mode isEqualToString:@"stretch"]) {
-        view.imageView.contentMode = UIViewContentModeScaleToFill;
-    }
+RCT_CUSTOM_VIEW_PROPERTY(frameId, NSString *, SKRNNativeFrameView)
+{
+  if (![json isKindOfClass:[NSString class]]) {
+    [view setNativeFrame:nullptr];
+    return;
+  }
+
+  auto frame = std::dynamic_pointer_cast<SKiOSNativeFrameWrapper>(
+      resolveNativeFrame(std::string([(NSString *)json UTF8String])));
+  [view setNativeFrame:std::move(frame)];
 }
 
-RCT_CUSTOM_VIEW_PROPERTY(frameData, id, SKRNNativeFrameView) {
-    if(!json) return;
-//    NSLog(@"got frame %@", json);
-    // Doing this because I couldn't find any resources on how to pass JSI stuff to native code :/
-    if(json[@"nativePtrStr"]) {
-        NSString *str = json[@"nativePtrStr"];
-        std::string cppstr = std::string([str UTF8String]);
-        
-        // If it looks stupid but it works, then it ain't stupid ;)
-        void *ptr = SKRNNativeVideo::StringToPointer(cppstr);
-        if(ptr == nullptr) {
-            NSLog(@"sadly pointer goes to null");
-            return;
-        }
-        SKiOSNativeFrameWrapper *wrapper = (SKiOSNativeFrameWrapper *)ptr;
-//        [view showDisplayBuffer:wrapper->buffer transform:wrapper->transform];
-        [view showDisplayBuffer:wrapper->buffer orientation:wrapper->orientation];
-    }
+RCT_CUSTOM_VIEW_PROPERTY(resizeMode, NSString *, SKRNNativeFrameView)
+{
+  [view setNativeResizeMode:
+      [json isKindOfClass:[NSString class]] ? (NSString *)json : nil];
 }
-
 
 @end
 
-@implementation SKRNNativeFrameView {
-}
-@synthesize image = _image;
-@synthesize imageView;
--(id)initWithCoder:(NSCoder *)coder {
-    self = [super initWithCoder:coder];
-    if(!self) return nil;
+@implementation SKRNNativeFrameView
+
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
+  self = [super initWithCoder:coder];
+  if (self != nil) {
     [self commonInit];
-    return self;
-}
--(id)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if(!self) return nil;
-    [self commonInit];
-    return self;
-}
--(void)commonInit {
-    imageView = [[UIImageView alloc] initWithFrame:self.bounds];
-    imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    imageView.contentMode = UIViewContentModeScaleAspectFit;
-    [self addSubview:imageView];
-}
--(void)showDisplayBuffer:(CMSampleBufferRef)buffer {
-    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
-    CFRetain(buf);
-    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
-//    size_t width = CVPixelBufferGetWidth(buf);
-//    size_t height = CVPixelBufferGetHeight(buf);
-    UIImage *uiImage = [UIImage imageWithCIImage:image];
-    self.image = uiImage;
-    CFRelease(buf);
-}
--(void)showDisplayBuffer:(CMSampleBufferRef)buffer transform:(CGAffineTransform)transform {
-    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
-    CFRetain(buf);
-    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
-    NSLog(@"transform was %@", NSStringFromCGAffineTransform(transform));
-//    if(!CGAffineTransformIsIdentity(transform)) {
-        // Manually invert the transform for iOS
-    
-    CGSize imageSize = CVImageBufferGetDisplaySize(buf);
-    // CoreImage coordinate system origin is at the bottom left corner
-    // and UIKit is at the top left corner. So we need to translate
-    // features positions before drawing them to screen. In order to do
-    // so we make an affine transform
-    CGAffineTransform ciTransform = CGAffineTransformMakeScale(1, -1);
-//    ciTransform = CGAffineTransformTranslate(ciTransform,
-//                                        0, -imageSize.height);
-    
-    
-    //    transform.b = -transform.b;
-    //    transform.c = -transform.c;
-    image = [image imageByApplyingTransform:transform];
-//    }
-    UIImage *uiImage = [UIImage imageWithCIImage:image];
-    self.image = uiImage;
-    CFRelease(buf);
-}
--(void)showDisplayBuffer:(CMSampleBufferRef)buffer orientation:(UIImageOrientation)orientation {
-    CVImageBufferRef buf = CMSampleBufferGetImageBuffer(buffer);
-    if(!buf) {
-        NSLog(@"SKRNNV : unable to get CVImageBufferRef from CMSampleBufferRef");
-    }
-    CFRetain(buf);
-    CIImage *image = [CIImage imageWithCVPixelBuffer:buf];
-    // As for why we're using imageByApplyingOrientation instead of just creating [UIImage imageWithCIImage:size:orientation:], the reason is that the orientation property somehow is disregarded by the UIImageView with that method.
-    image = [image imageByApplyingOrientation:SKRNNVCGImagePropertyOrientationForUIImageOrientation(orientation)];
-//    size_t width = CVPixelBufferGetWidth(buf);
-//    size_t height = CVPixelBufferGetHeight(buf);
-    UIImage *uiImage = [UIImage imageWithCIImage:image];
-//    NSLog(@"applying orientation %d got %d", orientation, uiImage.imageOrientation);
-    self.image = uiImage;
-    CFRelease(buf);
+  }
+  return self;
 }
 
-
--(void)setImage:(UIImage *)image {
-    _image = image;
-    imageView.image = image;
+- (instancetype)initWithFrame:(CGRect)frame
+{
+  self = [super initWithFrame:frame];
+  if (self != nil) {
+    [self commonInit];
+  }
+  return self;
 }
+
+- (void)commonInit
+{
+  _imageView = [[UIImageView alloc] initWithFrame:self.bounds];
+  _imageView.autoresizingMask =
+      UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  _imageView.contentMode = UIViewContentModeScaleAspectFit;
+  [self addSubview:_imageView];
+}
+
+- (UIImage *)image
+{
+  return _imageView.image;
+}
+
+- (void)setNativeResizeMode:(NSString *)resizeMode
+{
+  if ([resizeMode isEqualToString:@"cover"]) {
+    _imageView.contentMode = UIViewContentModeScaleAspectFill;
+  } else if ([resizeMode isEqualToString:@"stretch"]) {
+    _imageView.contentMode = UIViewContentModeScaleToFill;
+  } else {
+    _imageView.contentMode = UIViewContentModeScaleAspectFit;
+  }
+}
+
+- (void)setNativeFrame:(std::shared_ptr<SKiOSNativeFrameWrapper>)frame
+{
+  _nativeFrame = std::move(frame);
+  if (!_nativeFrame || !_nativeFrame->isValid() ||
+      _nativeFrame->buffer == nullptr) {
+    _imageView.image = nil;
+    return;
+  }
+
+  CVImageBufferRef imageBuffer =
+      CMSampleBufferGetImageBuffer(_nativeFrame->buffer);
+  if (imageBuffer == nullptr) {
+    _imageView.image = nil;
+    return;
+  }
+
+  CIImage *image = [CIImage imageWithCVPixelBuffer:imageBuffer];
+  image = [image imageByApplyingOrientation:
+      CGOrientationForUIImageOrientation(_nativeFrame->orientation)];
+  CIContext *context = [CIContext contextWithOptions:nil];
+  CGImageRef rendered = [context createCGImage:image fromRect:image.extent];
+  if (rendered == nullptr) {
+    _imageView.image = nil;
+    return;
+  }
+  _imageView.image = [UIImage imageWithCGImage:rendered];
+  CGImageRelease(rendered);
+}
+
 @end
-
-
-CGImagePropertyOrientation SKRNNVCGImagePropertyOrientationForUIImageOrientation(UIImageOrientation uiOrientation) {
-    switch (uiOrientation) {
-        case UIImageOrientationUp: return kCGImagePropertyOrientationUp;
-        case UIImageOrientationDown: return kCGImagePropertyOrientationDown;
-        case UIImageOrientationLeft: return kCGImagePropertyOrientationLeft;
-        case UIImageOrientationRight: return kCGImagePropertyOrientationRight;
-        case UIImageOrientationUpMirrored: return kCGImagePropertyOrientationUpMirrored;
-        case UIImageOrientationDownMirrored: return kCGImagePropertyOrientationDownMirrored;
-        case UIImageOrientationLeftMirrored: return kCGImagePropertyOrientationLeftMirrored;
-        case UIImageOrientationRightMirrored: return kCGImagePropertyOrientationRightMirrored;
-    }
-}
-UIImageOrientation SKRNNVUIImageOrientationForCGImagePropertyOrientation(CGImagePropertyOrientation cgOrientation) {
-    switch (cgOrientation) {
-        case kCGImagePropertyOrientationUp: return UIImageOrientationUp;
-        case kCGImagePropertyOrientationDown: return UIImageOrientationDown;
-        case kCGImagePropertyOrientationLeft: return UIImageOrientationLeft;
-        case kCGImagePropertyOrientationRight: return UIImageOrientationRight;
-        case kCGImagePropertyOrientationUpMirrored: return UIImageOrientationUpMirrored;
-        case kCGImagePropertyOrientationDownMirrored: return UIImageOrientationDownMirrored;
-        case kCGImagePropertyOrientationLeftMirrored: return UIImageOrientationLeftMirrored;
-        case kCGImagePropertyOrientationRightMirrored: return UIImageOrientationRightMirrored;
-    }
-}

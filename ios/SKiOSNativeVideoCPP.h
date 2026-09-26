@@ -1,73 +1,83 @@
-//
-//  SKiOSNativeVideoCPP.hpp
-//  react-native-native-video
-//
-//  Created by Switt Kongdachalert on 4/1/2565 BE.
-//
+#ifndef SK_IOS_NATIVE_VIDEO_CPP_H
+#define SK_IOS_NATIVE_VIDEO_CPP_H
+
 #import <AVFoundation/AVFoundation.h>
-#ifdef __cplusplus
-#import "react-native-native-video.h"
-#endif
+#import <UIKit/UIKit.h>
 
-#ifndef SKiOSNativeVideoCPP_hpp
-#define SKiOSNativeVideoCPP_hpp
-
-@interface SKRNNVRetainChecker : NSObject
-@end
+#include "react-native-native-video.h"
 
 namespace SKRNNativeVideo {
+
 double SKRNNVCGAffineTransformGetRotation(CGAffineTransform transform);
 UIImageOrientation SKRNNVRotationValueToUIImageOrientation(double rotation);
 
-class SKiOSNativeFrameWrapper : public SKNativeFrameWrapper {
-    bool _hasSize = false;
-    SKRNSize _size;
-public:
-    CMSampleBufferRef buffer;
-    CGAffineTransform transform;
-    UIImageOrientation orientation;
-    /** This buffer is CFRetained +1 by the wrapper. You are supposed to call CFRelease() on any other dependencies on this buffer yourself.*/
-    SKiOSNativeFrameWrapper(CMSampleBufferRef buf, CGAffineTransform transform, UIImageOrientation orientation);
-    ~SKiOSNativeFrameWrapper();
-    /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
-    virtual std::string platform() { return "iOS"; };
-    // This should free/close native resources
-    virtual void close();
-    // Supposed to return ArrayBuffer
-    virtual facebook::jsi::Value arrayBufferValue(facebook::jsi::Runtime &runtime);
-    virtual SKRNSize size();
-    virtual std::string base64(std::string format);
-    virtual std::string md5();
+class SKiOSNativeFrameWrapper final : public SKNativeFrameWrapper {
+ public:
+  CMSampleBufferRef buffer = nullptr;
+  const CGAffineTransform transform;
+  const UIImageOrientation orientation;
+
+  SKiOSNativeFrameWrapper(
+      CMSampleBufferRef buffer,
+      CGAffineTransform transform,
+      UIImageOrientation orientation,
+      int index,
+      double timestamp);
+  ~SKiOSNativeFrameWrapper() override;
+
+  std::string platform() const override { return "iOS"; }
+  void close() override;
+  facebook::jsi::Value arrayBufferValue(
+      facebook::jsi::Runtime &runtime) override;
+  SKRNSize size() const override;
+  size_t bytesPerRow() const override;
+  std::string base64(const std::string &format) override;
+  std::string md5() override;
+
+ private:
+  mutable bool hasSize_ = false;
+  mutable SKRNSize size_{0, 0};
 };
 
-class SKiOSNativeVideoWrapper : public SKNativeVideoWrapper {
-    int _numFrames;
-    NSArray <NSValue *>*frameTimeMap;
-    UIImageOrientation orientation = UIImageOrientationUp;
-    bool _hasSize = false;
-    SKRNSize _size;
-    
-public:
-    NSError *_lastError;
-    AVAsset *asset;
-    AVAssetReader *reader;
-    AVAssetTrack *videoTrack;
-    AVAssetReaderTrackOutput *readerOutput;
-    SKRNNVRetainChecker *checker;
-    SKiOSNativeVideoWrapper(std::string sourceUri);
-    ~SKiOSNativeVideoWrapper();
-    virtual void close();
-    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index);
-    virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(int index, int numFrames);
-    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time);
-    virtual int numFrames() {return _numFrames;};
-    virtual double frameRate();
-    virtual SKRNSize size();
-    virtual double duration();
-private:
-    void initialReadAsset();
+class SKiOSNativeVideoWrapper final : public SKNativeVideoWrapper {
+ public:
+  explicit SKiOSNativeVideoWrapper(const std::string &sourceUri);
+  ~SKiOSNativeVideoWrapper() override;
+
+  void close() override;
+  std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index) override;
+  std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(
+      int index,
+      int numFrames) override;
+  std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time) override;
+  int numFrames() const override { return numFrames_; }
+  double frameRate() const override { return frameRate_; }
+  SKRNSize size() const override { return size_; }
+  double duration() const override { return duration_; }
+  double frameTimestampAtIndex(int index) const override;
+  int frameIndexAtTime(double time) const override;
+
+ private:
+  bool loadVideoTrack();
+  bool buildFrameTimeMap();
+  bool createRandomAccessReader();
+  CMTime frameDurationAtIndex(int index) const;
+
+  int numFrames_ = 0;
+  double frameRate_ = 0;
+  double duration_ = 0;
+  SKRNSize size_{0, 0};
+  NSArray<NSValue *> *frameTimeMap = nil;
+  UIImageOrientation orientation = UIImageOrientationUp;
+  CGAffineTransform preferredTransform = CGAffineTransformIdentity;
+
+  NSError *lastError = nil;
+  AVURLAsset *asset = nil;
+  AVAssetReader *reader = nil;
+  AVAssetTrack *videoTrack = nil;
+  AVAssetReaderTrackOutput *readerOutput = nil;
 };
 
-};
+} // namespace SKRNNativeVideo
 
-#endif /* SKiOSNativeVideoCPP_hpp */
+#endif
