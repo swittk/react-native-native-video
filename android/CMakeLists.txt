@@ -1,56 +1,65 @@
 cmake_minimum_required(VERSION 3.4.1)
+project(reactnativenativevideo)
 
-set (CMAKE_VERBOSE_MAKEFILE ON)
-set (CMAKE_CXX_STANDARD 14)
-#set (NODE_MODULES_DIR "../node_modules") # NODE_MODULES_DIR is set from the build.gradle file
-set (RN_SO_DIR ${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/first-party/react/jni)
-set (FBJNI_HEADERS_DIR ${RN_SO_DIR}/../../fbjni/headers)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+if(RNNATIVEVIDEO_NEW_ARCH)
+  set(CMAKE_CXX_STANDARD 20)
+else()
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-message(STATUS "NODE_MODULES_DIR of React-Native-Native-Video CMAKE is ${NODE_MODULES_DIR}")
-
-# REACT_NATIVE_VERSION is set from the build.gradle file
-if(${REACT_NATIVE_VERSION} LESS 66)
-set (
-    INCLUDE_JSI_CPP
-    "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi/jsi/jsi.cpp"
+set(NATIVE_VIDEO_SOURCES
+  ../cpp/react-native-native-video.cpp
+  SKAndroidNativeVideoCPP.cpp
+  SKAndroidNativeVideoCPPOnLoad.cpp
 )
-#   set (
-#           INCLUDE_JSIDYNAMIC_CPP
-#           "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi/jsi/JSIDynamic.cpp"
-#   )
+
+if(RNNATIVEVIDEO_NEW_ARCH)
+  list(APPEND NATIVE_VIDEO_SOURCES NativeVideoBindings.cpp)
+else()
+  list(APPEND NATIVE_VIDEO_SOURCES NativeVideoLegacyBindings.cpp)
 endif()
 
-set (BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
-set (PACKAGE_NAME "reactnativenativevideo")
+add_library(reactnativenativevideo SHARED ${NATIVE_VIDEO_SOURCES})
 
-
-add_library(${PACKAGE_NAME}
-            SHARED
-            ${INCLUDE_JSI_CPP}
-            ${INCLUDE_JSIDYNAMIC_CPP}
-            ../cpp/react-native-native-video.cpp
-            cpp-adapter.cpp
-            SKAndroidNativeVideoCPP.cpp
-            SKAndroidNativeVideoCPPOnLoad.cpp
+target_compile_definitions(
+  reactnativenativevideo
+  PRIVATE
+  RNNATIVEVIDEO_NEW_ARCH=${RNNATIVEVIDEO_NEW_ARCH}
 )
 
-# Specifies a path to native header files.
-include_directories(
-            ../cpp
-            .
-            "${FBJNI_HEADERS_DIR}"
-            "${NODE_MODULES_DIR}/react-native/React"
-            "${NODE_MODULES_DIR}/react-native/React/Base"
-            "${NODE_MODULES_DIR}/react-native/ReactCommon"
-            "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi"
-            "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
-            "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/java/com/facebook/react/turbomodule/core/jni/ReactCommon"
-            # ../node_modules/react-native/ReactAndroid/src/main/jni/react/jni/JavaScriptExecutorHolder.h
-            # ../node_modules/react-native/ReactAndroid/src/main/jni/react/jni
-            "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/react"
-            "${NODE_MODULES_DIR}/react-native/ReactCommon/turbomodule/core"
-            "${NODE_MODULES_DIR}/react-native/ReactCommon/turbomodule"
-            "${NODE_MODULES_DIR}/react-native/React"
-            "${NODE_MODULES_DIR}/react-native/React/Base"
-            "${NODE_MODULES_DIR}/react-native/ReactCommon/jsi"
+target_include_directories(
+  reactnativenativevideo
+  PRIVATE
+  .
+  ../cpp
+  "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
+  "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/react/turbomodule"
+)
+
+find_library(android-lib android)
+find_library(jnigraphics-lib jnigraphics)
+find_library(log-lib log)
+find_package(ReactAndroid REQUIRED CONFIG)
+find_package(fbjni REQUIRED CONFIG)
+
+# RN 0.76+ folds the legacy JNI libraries into `reactnative`; RN 0.73 exposes
+# the equivalent symbols through `reactnativejni`.
+if(TARGET ReactAndroid::reactnative)
+  set(REACT_NATIVE_RUNTIME_TARGET ReactAndroid::reactnative)
+elseif(TARGET ReactAndroid::reactnativejni)
+  set(REACT_NATIVE_RUNTIME_TARGET ReactAndroid::reactnativejni)
+else()
+  message(FATAL_ERROR "ReactAndroid did not expose a supported runtime target")
+endif()
+
+target_link_libraries(
+  reactnativenativevideo
+  ReactAndroid::jsi
+  ${REACT_NATIVE_RUNTIME_TARGET}
+  fbjni::fbjni
+  ${android-lib}
+  ${jnigraphics-lib}
+  ${log-lib}
 )

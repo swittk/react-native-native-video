@@ -4,45 +4,46 @@ We want this community to be friendly and respectful to each other. Please follo
 
 ## Development workflow
 
-To get started with the project, run `yarn` in the root directory to install the required dependencies for each package:
+Use Node 18 or newer and pnpm 8.15.4. Install both the RN 0.83 library
+toolchain and the RN 0.73 example from the repository root:
 
 ```sh
-yarn
+corepack pnpm install --frozen-lockfile
 ```
-
-> While it's possible to use [`npm`](https://github.com/npm/cli), the tooling is built around [`yarn`](https://classic.yarnpkg.com/), so you'll have an easier time if you use `yarn` for development.
 
 While developing, you can run the [example app](/example/) to test your changes. Any changes you make in your library's JavaScript code will be reflected in the example app without a rebuild. If you change any native code, then you'll need to rebuild the example app.
 
 To start the packager:
 
 ```sh
-yarn example start
+pnpm example:start
 ```
 
 To run the example app on Android:
 
 ```sh
-yarn example android
+pnpm example:android
 ```
 
 To run the example app on iOS:
 
 ```sh
-yarn example ios
+pnpm example:ios
 ```
 
 Make sure your code passes TypeScript. Run the following to verify:
 
 ```sh
-yarn typescript
+pnpm typecheck
+pnpm example:typecheck
 ```
 
 No unit tests; no lint. I respect each person's formatting choices.
 
 To edit the Objective-C files, open `example/ios/NativeVideoExample.xcworkspace` in XCode and find the source files at `Pods > Development Pods > react-native-native-video`.
 
-To edit the Kotlin files, open `example/android` in Android studio and find the source files at `reactnativenativevideo` under `Android`.
+To edit the Java/C++ files, open `example/android` in Android Studio and find
+the source files at `react-native-native-video` under `Android`.
 
 ### Commit message convention
 No convention. No pre-commit hooks. Please, life's complicated as it is.
@@ -59,25 +60,17 @@ I also don't like pre-commit hooks.
 
 ### Publishing to npm
 
-We use [release-it](https://github.com/release-it/release-it) to make it easier to publish new versions. It handles common tasks like bumping version based on semver, creating tags and releases etc.
-
-To publish new versions, run the following:
-
-```sh
-yarn release
-```
+Publishing is owner-only and is intentionally not automated by this repository.
 
 ### Scripts
 
 The `package.json` file contains various scripts for common tasks:
 
-- `yarn bootstrap`: setup project by installing all dependencies and pods.
-- `yarn typescript`: type-check files with TypeScript.
-- `yarn lint`: lint files with ESLint.
-- `yarn test`: run unit tests with Jest.
-- `yarn example start`: start the Metro server for the example app.
-- `yarn example android`: run the example app on Android.
-- `yarn example ios`: run the example app on iOS.
+- `pnpm typecheck`: type-check the RN 0.83 package source.
+- `pnpm example:typecheck`: type-check the RN 0.73 example.
+- `pnpm example:start`: start Metro for the example app.
+- `pnpm example:android`: run the old-architecture example on Android.
+- `pnpm example:ios`: run the old-architecture example on iOS.
 
 ### Sending a pull request
 

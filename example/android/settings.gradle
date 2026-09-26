@@ -1,8 +1,50 @@
 rootProject.name = 'NativeVideoExample'
-apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
-include ':app'
-apply from: new File(["node", "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle")
-useExpoModules()
 
-include ':reactnativenativevideo'
-project(':reactnativenativevideo').projectDir = new File(rootProject.projectDir, '../../android')
+File canonicalOrOriginal(File target) {
+    try {
+        return target.canonicalFile
+    } catch (IOException ignored) {
+        return target
+    }
+}
+
+File resolveFromNodeModules(String relativePath) {
+    List<File> searchRoots = [
+        file("../node_modules"),
+        file("../../node_modules"),
+    ]
+
+    for (File root : searchRoots) {
+        if (!root.exists()) {
+            continue
+        }
+        File direct = new File(root, relativePath)
+        if (direct.exists()) {
+            return canonicalOrOriginal(direct)
+        }
+        File hoisted = new File(root, ".pnpm/node_modules/${relativePath}")
+        if (hoisted.exists()) {
+            return canonicalOrOriginal(hoisted)
+        }
+    }
+    return null
+}
+
+File requireFromNodeModules(String relativePath) {
+    File resolved = resolveFromNodeModules(relativePath)
+    if (resolved == null || !resolved.exists()) {
+        throw new GradleException(
+            "Could not find ${relativePath}. Run `pnpm install` from the workspace root."
+        )
+    }
+    return resolved
+}
+
+File nativeModulesGradle = requireFromNodeModules(
+    "@react-native-community/cli-platform-android/native_modules.gradle"
+)
+apply from: nativeModulesGradle
+applyNativeModulesSettingsGradle(settings)
+
+include ':app'
+includeBuild(requireFromNodeModules("@react-native/gradle-plugin"))

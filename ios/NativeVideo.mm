@@ -1,80 +1,137 @@
 #import "NativeVideo.h"
-#import "react-native-native-video.h"
-#import <React/RCTUtils.h>
-#import <React/RCTBridge+Private.h>
-#import <jsi/jsi.h>
-#import <ReactCommon/CallInvoker.h>
-#import "SKiOSNativeVideoCPP.h"
 
+#import "SKiOSNativeVideoCPP.h"
+#import "react-native-native-video.h"
+
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
+#else
+#import <React/RCTBridge+Private.h>
+#import <React/RCTUtils.h>
+#endif
+
+using namespace facebook;
 using namespace SKRNNativeVideo;
 
-//SKRNNativeVideo::SKiOSNativeFrameWrapper
+#ifdef RCT_NEW_ARCH_ENABLED
+@interface NativeVideo () <RCTTurboModuleWithJSIBindings>
+@end
+#else
+@interface NativeVideo ()
+@property (nonatomic, weak) RCTBridge *bridge;
+@property (nonatomic, assign) jsi::Runtime *installedRuntime;
+@property (nonatomic, assign) BOOL invalidated;
+@end
+#endif
 
 @implementation NativeVideo
+
+RCT_EXPORT_MODULE(NativeVideo)
+
++ (BOOL)requiresMainQueueSetup
+{
+  return YES;
+}
+
+#ifdef RCT_NEW_ARCH_ENABLED
+
+- (NSNumber *)multiply:(double)a b:(double)b
+{
+  return @(a * b);
+}
+
+- (std::shared_ptr<react::TurboModule>)getTurboModule:
+    (const react::ObjCTurboModule::InitParams &)params
+{
+  return std::make_shared<react::NativeVideoSpecJSI>(params);
+}
+
+- (void)installJSIBindingsWithRuntime:(jsi::Runtime &)runtime
+                          callInvoker:(const std::shared_ptr<react::CallInvoker> &)callInvoker
+{
+  (void)callInvoker;
+  SKRNNativeVideo::install(
+      runtime,
+      [](jsi::Runtime &, const std::string &path) {
+        return std::make_shared<SKiOSNativeVideoWrapper>(path);
+      });
+}
+
+#else
+
 @synthesize bridge = _bridge;
 
-RCT_EXPORT_MODULE()
-
-// Example method for C++
-// See the implementation of the example module in the `cpp` folder
-RCT_EXPORT_METHOD(multiply:(nonnull NSNumber*)a withB:(nonnull NSNumber*)b
+RCT_EXPORT_METHOD(multiply:(nonnull NSNumber *)a
+                  withB:(nonnull NSNumber *)b
                   withResolver:(RCTPromiseResolveBlock)resolve
                   withReject:(RCTPromiseRejectBlock)reject)
 {
-    NSNumber *result = @(multiply([a floatValue], [b floatValue]));
-    
-    resolve(result);
+  (void)reject;
+  resolve(@([a doubleValue] * [b doubleValue]));
 }
 
-
-+ (BOOL)requiresMainQueueSetup {
-    return YES;
+- (void)setBridge:(RCTBridge *)bridge
+{
+  _bridge = bridge;
+  _invalidated = NO;
+  _installedRuntime = nullptr;
+  [[NSNotificationCenter defaultCenter]
+      addObserver:self
+         selector:@selector(javaScriptDidLoad:)
+             name:RCTJavaScriptDidLoadNotification
+           object:bridge];
+  [self installLegacyJSIBindingsIfReady];
 }
 
-
-
-- (void)setBridge:(RCTBridge *)bridge {
-    _bridge = bridge;
-    _setBridgeOnMainQueue = RCTIsMainQueue();
-    [self installLibrary];
+- (void)javaScriptDidLoad:(NSNotification *)notification
+{
+  (void)notification;
+  [self installLegacyJSIBindingsIfReady];
 }
 
--(void)installLibrary {
-//    self.bridge.reactInstance;
-    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)self.bridge;
-    if (!cxxBridge.runtime) {
-        
-        /**
-         * This is a workaround to install library
-         * as soon as runtime becomes available and is
-         * not recommended. If you see random crashes in iOS
-         * global.xxx not found etc. use this.
-         */
-        
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.001 * NSEC_PER_SEC),
-                       dispatch_get_main_queue(), ^{
-            /**
-             When refreshing the app while debugging, the setBridge
-             method is called too soon. The runtime is not ready yet
-             quite often. We need to install library as soon as runtime
-             becomes available.
-             */
-            [self installLibrary];
-            
-        });
-        return;
-    }
-    facebook::jsi::Runtime *runtime = (facebook::jsi::Runtime *)cxxBridge.runtime;
-    install(*runtime, [](facebook::jsi::Runtime& runtime, std::string path) -> std::shared_ptr<SKNativeVideoWrapper> {
-        std::shared_ptr<SKNativeVideoWrapper>ret =  std::make_shared<SKiOSNativeVideoWrapper>(path);
-        return ret;
-    });
+- (void)installLegacyJSIBindingsIfReady
+{
+  if (_invalidated) {
+    return;
+  }
+  RCTBridge *bridge = _bridge;
+  if (bridge == nil) {
+    return;
+  }
+
+  RCTBridge *runtimeBridge = [bridge isKindOfClass:[RCTCxxBridge class]]
+      ? bridge
+      : bridge.batchedBridge;
+  if (![runtimeBridge isKindOfClass:[RCTCxxBridge class]]) {
+    return;
+  }
+  RCTCxxBridge *cxxBridge = (RCTCxxBridge *)runtimeBridge;
+  auto *runtime = static_cast<jsi::Runtime *>(cxxBridge.runtime);
+  if (runtime == nullptr || runtime == _installedRuntime) {
+    return;
+  }
+
+  SKRNNativeVideo::install(
+      *runtime,
+      [](jsi::Runtime &, const std::string &path) {
+        return std::make_shared<SKiOSNativeVideoWrapper>(path);
+      });
+  _installedRuntime = runtime;
 }
 
-- (void)invalidate {
-    RCTCxxBridge *cxxBridge = (RCTCxxBridge *)self.bridge;
-    facebook::jsi::Runtime *runtime = (facebook::jsi::Runtime *)cxxBridge.runtime;
-    cleanup(*runtime);
+- (void)invalidate
+{
+  _invalidated = YES;
+  _installedRuntime = nullptr;
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  _bridge = nil;
 }
+
+- (void)dealloc
+{
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+#endif
 
 @end

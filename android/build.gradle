@@ -1,109 +1,185 @@
+import com.android.Version
 import java.nio.file.Paths
 
-static def findNodeModules(baseDir) {
+static def findNodeModules(File baseDir) {
   def basePath = baseDir.toPath().normalize()
-  // Node's module resolution algorithm searches up to the root directory,
-  // after which the base path will be null
-  while (basePath) {
+  while (basePath != null) {
     def nodeModulesPath = Paths.get(basePath.toString(), "node_modules")
     def reactNativePath = Paths.get(nodeModulesPath.toString(), "react-native")
-    if (nodeModulesPath.toFile().exists() && reactNativePath.toFile().exists()) {
-      return nodeModulesPath.toString()
+    if (reactNativePath.toFile().exists()) {
+      return nodeModulesPath.toFile()
     }
     basePath = basePath.getParent()
   }
-  throw new GradleException("ReactNativeNativeVideo: Failed to find node_modules/ path!")
+  throw new GradleException(
+      "ReactNativeNativeVideo: unable to find react-native in a parent node_modules directory")
 }
 
-def nodeModules = findNodeModules(projectDir)
-logger.warn("ReactNativeNativeVideo: node_modules/ found at: ${nodeModules}")
-
+// Resolve React Native from the consuming app. The in-repo example owns an RN
+// 0.73 install while the library root intentionally owns RN 0.83 for modern
+// codegen validation.
+def nodeModules = findNodeModules(rootProject.projectDir)
+def reactNativeDir = new File(nodeModules, "react-native")
 def reactProperties = new Properties()
-file("$nodeModules/react-native/ReactAndroid/gradle.properties").withInputStream { reactProperties.load(it) }
-def REACT_NATIVE_VERSION = reactProperties.getProperty("VERSION_NAME").split("\\.")[1].toInteger()
+file("${reactNativeDir}/ReactAndroid/gradle.properties").withInputStream {
+  reactProperties.load(it)
+}
+def reactNativeVersion = reactProperties.getProperty("VERSION_NAME")
+def reactNativeMinor = reactNativeVersion.startsWith("0.0.0-")
+    ? 1000
+    : reactNativeVersion.split("\\.")[1].toInteger()
+if (reactNativeMinor < 73) {
+  throw new GradleException(
+      "ReactNativeNativeVideo requires React Native 0.73 or newer; found ${reactNativeVersion}")
+}
 
+static def supportsNamespace() {
+  def parsed = Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize(".")
+  def major = parsed[0].toInteger()
+  def minor = parsed[1].toInteger()
+  return major > 7 || (major == 7 && minor >= 3)
+}
+
+def safeExtGet(String property, Object fallback) {
+  return rootProject.ext.has(property) ? rootProject.ext.get(property) : fallback
+}
+
+def nativeVideoExtGet(String property, Object fallback) {
+  def prefixed = "NativeVideo_${property}"
+  return rootProject.ext.has(prefixed)
+      ? rootProject.ext.get(prefixed)
+      : safeExtGet(property, fallback)
+}
+
+def reactNativeArchitectures() {
+  def value = rootProject.getProperties().get("reactNativeArchitectures")
+  return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
+}
 
 buildscript {
-    if (project == rootProject) {
-        repositories {
-            google()
-            mavenCentral()
-            jcenter()
-        }
-
-        dependencies {
-          classpath 'com.android.tools.build:gradle:4.2.0'
-        }
+  if (project == rootProject) {
+    repositories {
+      google()
+      mavenCentral()
     }
+    dependencies {
+      classpath "com.android.tools.build:gradle:8.12.0"
+      classpath "com.facebook.react:react-native-gradle-plugin"
+    }
+  }
 }
 
-apply plugin: 'com.android.library'
+apply plugin: "com.android.library"
 
-def safeExtGet(prop, fallback) {
-    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
-}
-def getExtOrDefault(name) {
-  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['VisionCamera_' + name]
-}
-def getExtOrDefaultValue(name, defaultValue) {
-  return rootProject.ext.has(name) ? rootProject.ext.get(name) : defaultValue
-}
+// RN 0.82+ is New-Architecture-only. RN 0.73-0.81 hosts select the architecture
+// explicitly, which leaves the RN 0.73 example on the legacy source set.
+def newArchitecture = reactNativeMinor >= 82 ||
+    (rootProject.hasProperty("newArchEnabled") &&
+        rootProject.getProperty("newArchEnabled") == "true")
 
+apply plugin: "com.facebook.react"
+
+def javaCompatibility = reactNativeMinor >= 73
+    ? JavaVersion.VERSION_17
+    : JavaVersion.VERSION_1_8
 
 android {
-    compileSdkVersion safeExtGet('NativeVideo_compileSdkVersion', 29)
-    ndkVersion getExtOrDefaultValue('ndkVersion', '21.4.7075529')
-    defaultConfig {
-        minSdkVersion safeExtGet('NativeVideo_minSdkVersion', 16)
-        targetSdkVersion safeExtGet('NativeVideo_targetSdkVersion', 29)
-        versionCode 1
-        versionName "1.0"
+  if (supportsNamespace()) {
+    namespace "com.reactnativenativevideo"
+  }
 
-        externalNativeBuild {
-            cmake {
-                cppFlags "-O2 -frtti -fexceptions -Wall -fstack-protector-all"
-                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
-                // This is how the NODE_MODULES_DIR magic variable appears in our CMAKELISTS file
-                arguments "-DNODE_MODULES_DIR=${nodeModules.toString()}",
-                  // This is how the REACT_NATIVE_VERSION magic variable appears in our CMAKELISTS file
-                  "-DREACT_NATIVE_VERSION=${REACT_NATIVE_VERSION}"
-            }
-        }
+  compileSdkVersion nativeVideoExtGet("compileSdkVersion", newArchitecture ? 36 : 34)
+  ndkVersion nativeVideoExtGet("ndkVersion", newArchitecture ? "27.1.12297006" : "25.1.8937393")
 
-    }
+  defaultConfig {
+    minSdkVersion nativeVideoExtGet("minSdkVersion", newArchitecture ? 24 : 21)
+    targetSdkVersion nativeVideoExtGet("targetSdkVersion", newArchitecture ? 36 : 34)
 
     externalNativeBuild {
       cmake {
-        path "CMakeLists.txt"
+        cppFlags "-std=c++17 -frtti -fexceptions -Wall -Wextra"
+        arguments "-DANDROID_STL=c++_shared",
+            "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+            "-DNODE_MODULES_DIR=${nodeModules.absolutePath}",
+            "-DREACT_NATIVE_MINOR_VERSION=${reactNativeMinor}",
+            "-DRNNATIVEVIDEO_NEW_ARCH=${newArchitecture ? 1 : 0}"
+        abiFilters (*reactNativeArchitectures())
       }
     }
+  }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-        }
+  sourceSets {
+    main {
+      if (newArchitecture) {
+        java.srcDirs += ["src/newarch/java"]
+      } else {
+        java.srcDirs += ["src/oldarch/java"]
+        manifest.srcFile "src/oldarch/AndroidManifest.xml"
+      }
     }
-    lintOptions {
-        disable 'GradleCompatible'
+  }
+
+  externalNativeBuild {
+    cmake {
+      path "CMakeLists.txt"
     }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+  }
+
+  buildFeatures {
+    buildConfig true
+    prefab true
+  }
+
+  // ReactAndroid/fbjni are supplied by the consuming app. AGP otherwise copies
+  // the imported Prefab libraries into this AAR as if they belonged to us,
+  // producing duplicate libjsi/libreactnativejni entries on RN 0.73.
+  packagingOptions {
+    excludes += [
+        "**/libc++_shared.so",
+        "**/libfbjni.so",
+        "**/libfolly_json.so",
+        "**/libfolly_runtime.so",
+        "**/libglog.so",
+        "**/libjsi.so",
+        "**/libreactnative.so",
+        "**/libreactnativejni.so",
+    ]
+  }
+
+  buildTypes {
+    debug {
+      externalNativeBuild.cmake.cppFlags "-O1 -g"
     }
+    release {
+      minifyEnabled false
+      externalNativeBuild.cmake.cppFlags "-O2"
+    }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+  }
+
+  compileOptions {
+    sourceCompatibility javaCompatibility
+    targetCompatibility javaCompatibility
+  }
+}
+
+react {
+  libraryName = "RNNativeVideoSpec"
+  jsRootDir = file("..")
+  reactNativeDir = new File(nodeModules, "react-native")
+  codegenDir = new File(nodeModules, "@react-native/codegen")
+  codegenJavaPackageName = "com.reactnativenativevideo"
 }
 
 repositories {
-    mavenLocal()
-    maven {
-        // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-        url("$nodeModules/react-native/android")
-    }
-    google()
-    mavenCentral()
-    jcenter()
+  mavenLocal()
+  google()
+  mavenCentral()
 }
 
 dependencies {
-    //noinspection GradleDynamicVersion
-    implementation "com.facebook.react:react-native:+"  // From node_modules
+  implementation "com.facebook.react:react-android:${reactNativeVersion}"
 }
