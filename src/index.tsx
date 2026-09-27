@@ -28,6 +28,8 @@ export interface NativeFrameWrapper {
   readonly bytesPerRow: number;
   readonly pixelFormat: 'rgba8';
   readonly platform: 'iOS' | 'Android';
+  /** Primary decoded storage; CPU RGBA is produced lazily by arrayBuffer(). */
+  readonly nativeBufferType: 'cvPixelBuffer' | 'hardwareBuffer' | 'bitmap' | 'unknown';
   readonly isValid: boolean;
   /** Zero-based decoded frame index. */
   readonly index: number;

@@ -149,7 +149,7 @@ export default function App(): React.JSX.Element {
       replaceFrame(decoded);
       setFrameIndexText(String(index));
       setStatus(
-        `Frame ${decoded.index} @ ${decoded.timestamp.toFixed(6)}s: ` +
+        `Frame ${decoded.index} @ ${decoded.timestamp.toFixed(6)}s [${decoded.nativeBufferType}]: ` +
           `${rgba.byteLength} RGBA bytes, PNG ${base64Prefix}…, MD5 ${digest}`,
       );
     },
@@ -173,6 +173,52 @@ export default function App(): React.JSX.Element {
         `at ${mappedTimestamp.toFixed(6)}s; decoded frame ${decoded.index}.`,
     );
   }, [replaceFrame]);
+
+  /** Retains many native frames at once, seeks non-monotonically, then forces one CPU readback. */
+  const stressNativeFrames = React.useCallback(() => {
+    const opened = videoRef.current;
+    if (!opened || opened.numFrames < 1) {
+      return;
+    }
+
+    const last = opened.numFrames - 1;
+    const rawIndices = [
+      0,
+      Math.floor(last * 0.75),
+      Math.floor(last * 0.15),
+      Math.floor(last * 0.9),
+      Math.floor(last * 0.35),
+      Math.floor(last * 0.6),
+      1,
+      Math.max(0, last - 1),
+      Math.floor(last * 0.25),
+      Math.floor(last * 0.5),
+      Math.floor(last * 0.1),
+      last,
+    ];
+    const indices = Array.from(new Set(rawIndices.map(index => Math.max(0, Math.min(last, index)))));
+    const retained: NativeFrameWrapper[] = [];
+    try {
+      for (const index of indices) {
+        retained.push(opened.getFrameAtIndex(index));
+      }
+      const extra = opened.getFrameAtTime(opened.duration * 0.42);
+      retained.push(extra);
+      const hardwareCount = retained.filter(
+        item => item.nativeBufferType === 'hardwareBuffer',
+      ).length;
+      const readback = retained[Math.floor(retained.length / 2)].arrayBuffer();
+      setStatus(
+        `Stress retained ${retained.length} frames across non-monotonic seeks; ` +
+          `${hardwareCount} hardwareBuffer-backed; CPU readback ${readback.byteLength} bytes.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`Native-frame stress failed: ${message}`);
+    } finally {
+      retained.forEach(item => item.close());
+    }
+  }, []);
 
   /** Exercises batch decoding while retaining one frame for native preview. */
   const decodeBatch = React.useCallback(() => {
@@ -418,6 +464,13 @@ export default function App(): React.JSX.Element {
         </View>
         <View style={styles.buttonGap}>
           <Button accessibilityLabel="Decode three-frame batch" disabled={!video} title="Decode three-frame batch" onPress={decodeBatch} />
+        </View>
+        <View style={styles.buttonGap}>
+          <Button
+            disabled={!video}
+            title="Stress retained native frames"
+            onPress={stressNativeFrames}
+          />
         </View>
 
         <NativeVideoFrameView

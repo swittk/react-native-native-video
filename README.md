@@ -17,8 +17,16 @@ Install iOS pods after adding the dependency.
 ## Usage
 
 `openVideo(uri)` returns a native-backed video object. Frames can be selected
-by index or presentation time, read as RGBA8, encoded, previewed, and closed
-explicitly.
+by index or presentation time, kept in their platform-native decoded storage,
+read back as RGBA8 on demand, encoded, previewed, and closed explicitly.
+
+On iOS the primary frame storage is a `CVPixelBuffer`. On Android 10 / API 29+
+NativeVideo seeks with `MediaExtractor`, decodes through `MediaCodec` into a
+PRIVATE `ImageReader`, and retains an independent `AHardwareBuffer` for the
+frame. Android keeps the established Bitmap fallback for older or incompatible
+decoders. Calling `arrayBuffer()`, PNG/base64, or the legacy frame view is an
+explicit CPU rasterization/readback path rather than the primary frame
+representation.
 
 ```tsx
 import {
@@ -35,6 +43,7 @@ console.log({
   frameRate: video.frameRate,
   numFrames: video.numFrames,
   timestamp: frame.timestamp,
+  nativeBufferType: frame.nativeBufferType, // cvPixelBuffer / hardwareBuffer / bitmap
   rgbaBytes: frame.arrayBuffer().byteLength,
 });
 
@@ -47,7 +56,8 @@ video.close();
 
 The real [RN 0.73 example](example/) uses a document picker and exercises
 metadata, timestamp/index mapping, individual and batch frame decode, RGBA8,
-PNG/base64, MD5, native preview, and explicit close/reopen behavior. It keeps
+PNG/base64, MD5, native preview, retained native-frame stress, and explicit
+close/reopen behavior. It keeps
 `newArchEnabled=false` specifically to validate the legacy RCTBridgeModule/JSI
 installer. The package root remains on RN 0.83.10 for New Architecture builds.
 

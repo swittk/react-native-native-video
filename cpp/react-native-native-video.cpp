@@ -313,6 +313,9 @@ jsi::Value SKNativeFrameWrapper::get(
   if (property == "platform") {
     return jsi::String::createFromUtf8(runtime, platform());
   }
+  if (property == "nativeBufferType") {
+    return jsi::String::createFromUtf8(runtime, nativeBufferType());
+  }
   if (property == "isValid") {
     return jsi::Value(valid_);
   }
@@ -413,6 +416,7 @@ std::vector<jsi::PropNameID> SKNativeFrameWrapper::getPropertyNames(
       "bytesPerRow",
       "pixelFormat",
       "platform",
+      "nativeBufferType",
       "isValid",
       "index",
       "timestamp",

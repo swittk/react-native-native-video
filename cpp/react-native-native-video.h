@@ -75,6 +75,7 @@ class SKNativeFrameWrapper
       facebook::jsi::Runtime &runtime) override;
 
   virtual std::string platform() const { return "unknown"; }
+  virtual std::string nativeBufferType() const { return "unknown"; }
   virtual void close() {}
   virtual facebook::jsi::Value arrayBufferValue(
       facebook::jsi::Runtime &) {

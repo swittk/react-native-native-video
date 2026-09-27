@@ -41,6 +41,7 @@ target_include_directories(
 find_library(android-lib android)
 find_library(jnigraphics-lib jnigraphics)
 find_library(log-lib log)
+find_library(dl-lib dl)
 find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
 
@@ -62,4 +63,5 @@ target_link_libraries(
   ${android-lib}
   ${jnigraphics-lib}
   ${log-lib}
+  ${dl-lib}
 )

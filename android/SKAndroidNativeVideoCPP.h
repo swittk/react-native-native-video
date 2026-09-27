@@ -2,6 +2,7 @@
 #define SK_ANDROID_NATIVE_VIDEO_CPP_H
 
 #include <jni.h>
+#include <android/hardware_buffer.h>
 
 #include <memory>
 #include <mutex>
@@ -26,24 +27,27 @@ class SKAndroidNativeFrameWrapper final : public SKNativeFrameWrapper {
   SKAndroidNativeFrameWrapper(
       JavaVM *jvm,
       JNIEnv *env,
-      jobject bitmap,
+      jobject javaFrame,
       int index,
       double timestamp);
   ~SKAndroidNativeFrameWrapper() override;
 
   std::string platform() const override { return "Android"; }
+  std::string nativeBufferType() const override;
   void close() override;
   facebook::jsi::Value arrayBufferValue(
       facebook::jsi::Runtime &runtime) override;
   SKRNSize size() const override;
   size_t bytesPerRow() const override;
   std::string base64(const std::string &format) override;
-  jobject newBitmapGlobalRef(JNIEnv *env) const;
+
+  jobject bitmap(JNIEnv *env) const;
 
  private:
-  mutable std::mutex bitmapMutex_;
-  jobject bitmap = nullptr;
+  mutable std::mutex frameMutex_;
   JavaVM *jvm_ = nullptr;
+  jobject javaFrame_ = nullptr;
+  AHardwareBuffer *hardwareBuffer_ = nullptr;
 };
 
 class SKAndroidNativeVideoWrapper final : public SKNativeVideoWrapper {
