@@ -136,6 +136,12 @@ class SKNativeVideoWrapper
 
 
 
+#if defined(__GNUC__)
+#define SKRNNATIVEVIDEO_BRIDGE_EXPORT __attribute__((visibility("default")))
+#else
+#define SKRNNATIVEVIDEO_BRIDGE_EXPORT
+#endif
+
 /**
  * Stable C ABI for companion native adapters. A lease retains the underlying
  * NativeFrame HostObject while a consumer imports its native buffer.
@@ -143,10 +149,14 @@ class SKNativeVideoWrapper
  * The returned native-buffer pointer is borrowed from the lease. Consumers
  * should import/copy/wrap it synchronously, then release the lease.
  */
-extern "C" void *SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId);
-extern "C" void *SKRNNativeVideoNativeBufferLeaseGetPointer(void *lease);
-extern "C" const char *SKRNNativeVideoNativeBufferLeaseGetType(void *lease);
-extern "C" void SKRNNativeVideoReleaseNativeBufferLease(void *lease);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
+SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
+SKRNNativeVideoNativeBufferLeaseGetPointer(void *lease);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT const char *
+SKRNNativeVideoNativeBufferLeaseGetType(void *lease);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void
+SKRNNativeVideoReleaseNativeBufferLease(void *lease);
 
 } // namespace SKRNNativeVideo
 

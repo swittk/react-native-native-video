@@ -65,3 +65,12 @@ target_link_libraries(
   ${log-lib}
   ${dl-lib}
 )
+
+target_link_options(
+  reactnativenativevideo
+  PRIVATE
+  "-Wl,-u,SKRNNativeVideoAcquireNativeBufferLease"
+  "-Wl,-u,SKRNNativeVideoNativeBufferLeaseGetPointer"
+  "-Wl,-u,SKRNNativeVideoNativeBufferLeaseGetType"
+  "-Wl,-u,SKRNNativeVideoReleaseNativeBufferLease"
+)

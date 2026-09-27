@@ -123,7 +123,8 @@ struct NativeBufferLease {
   std::string type;
 };
 
-extern "C" void *SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId) {
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
+SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId) {
   if (nativeId == nullptr) {
     return nullptr;
   }
@@ -143,19 +144,20 @@ extern "C" void *SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId) {
   return lease;
 }
 
-extern "C" void *
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
 SKRNNativeVideoNativeBufferLeaseGetPointer(void *opaqueLease) {
   auto *lease = static_cast<NativeBufferLease *>(opaqueLease);
   return lease == nullptr ? nullptr : lease->buffer;
 }
 
-extern "C" const char *
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT const char *
 SKRNNativeVideoNativeBufferLeaseGetType(void *opaqueLease) {
   auto *lease = static_cast<NativeBufferLease *>(opaqueLease);
   return lease == nullptr ? nullptr : lease->type.c_str();
 }
 
-extern "C" void SKRNNativeVideoReleaseNativeBufferLease(void *opaqueLease) {
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void
+SKRNNativeVideoReleaseNativeBufferLease(void *opaqueLease) {
   delete static_cast<NativeBufferLease *>(opaqueLease);
 }
 
