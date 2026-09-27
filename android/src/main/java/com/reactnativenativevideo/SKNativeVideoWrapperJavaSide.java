@@ -368,7 +368,7 @@ final class SKNativeVideoWrapperJavaSide {
     private final MediaCodec codec;
     private final ImageReader imageReader;
     private final HandlerThread imageThread;
-    private final ArrayBlockingQueue<Image> images = new ArrayBlockingQueue<>(4);
+    private final ArrayBlockingQueue<Image> images = new ArrayBlockingQueue<>(16);
     private boolean closed;
 
     HardwareFrameDecoder(ReactApplicationContext context, String sourceUri, Uri uri) throws IOException {
@@ -393,7 +393,7 @@ final class SKNativeVideoWrapperJavaSide {
       int encodedWidth = videoFormat.getInteger(MediaFormat.KEY_WIDTH);
       int encodedHeight = videoFormat.getInteger(MediaFormat.KEY_HEIGHT);
       imageReader = ImageReader.newInstance(
-          encodedWidth, encodedHeight, ImageFormat.PRIVATE, 4,
+          encodedWidth, encodedHeight, ImageFormat.PRIVATE, 16,
           HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE);
 
       imageThread = new HandlerThread("RNNativeVideo-HardwareFrames");

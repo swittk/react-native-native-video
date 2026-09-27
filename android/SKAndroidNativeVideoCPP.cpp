@@ -32,7 +32,6 @@ jmethodID base64ForBitmapMethod = nullptr;
 
 jmethodID frameGetBitmapMethod = nullptr;
 jmethodID frameGetHardwareBufferMethod = nullptr;
-jmethodID frameReleaseImageMethod = nullptr;
 jmethodID frameGetWidthMethod = nullptr;
 jmethodID frameGetHeightMethod = nullptr;
 jmethodID frameCloseMethod = nullptr;
@@ -164,9 +163,7 @@ void initializeJavaBindings(JNIEnv *env) {
   frameGetBitmapMethod =
       env->GetMethodID(frameWrapperClass, "getBitmap", "()Landroid/graphics/Bitmap;");
   frameGetHardwareBufferMethod = env->GetMethodID(
-      frameWrapperClass, "getHardwareBuffer", "()Landroid/hardware/HardwareBuffer;");
-  frameReleaseImageMethod =
-      env->GetMethodID(frameWrapperClass, "releaseImage", "()V");
+      frameWrapperClass, "getHardwareBuffer", "()Ljava/lang/Object;");
   frameGetWidthMethod =
       env->GetMethodID(frameWrapperClass, "getWidth", "()I");
   frameGetHeightMethod =
@@ -434,13 +431,6 @@ SKAndroidNativeFrameWrapper::SKAndroidNativeFrameWrapper(
     }
   }
 
-  // Once we own an independent native AHardwareBuffer ref, release the
-  // ImageReader Image immediately so callers can retain arbitrarily many
-  // NativeFrame HostObjects without exhausting maxImages.
-  if (frameReleaseImageMethod != nullptr) {
-    env->CallVoidMethod(javaFrame_, frameReleaseImageMethod);
-    clearPendingException(env);
-  }
 
   setValid(true);
 }

@@ -6,9 +6,9 @@ import android.media.Image;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
-import android.hardware.HardwareBuffer;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.facebook.proguard.annotations.DoNotStrip;
 
@@ -18,10 +18,10 @@ import java.util.Collections;
  * A decoded Android frame whose primary representation may be a hardware buffer.
  *
  * On API 29+ the decoder hands us an ImageReader-backed Image first. Native C++
- * acquires an independent AHardwareBuffer reference immediately and then calls
- * releaseImage(), so ImageReader slots are never held hostage by long-lived JS
- * frame objects. CPU pixels are decoded lazily only if a caller explicitly asks
- * for arrayBuffer/base64/NativeFrameView.
+ * retains an AHardwareBuffer reference while this frame keeps the Image open,
+ * matching Android's lifetime contract for Image.getHardwareBuffer(). CPU
+ * pixels are decoded lazily only if a caller explicitly asks for
+ * arrayBuffer/base64/NativeFrameView.
  */
 @DoNotStrip
 final class SKAndroidNativeFrameJavaSide {
@@ -98,12 +98,12 @@ final class SKAndroidNativeFrameJavaSide {
   }
 
   @DoNotStrip
-  synchronized @Nullable HardwareBuffer getHardwareBuffer() {
-    if (!hardwareBacked || image == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+  synchronized @Nullable Object getHardwareBuffer() {
+    if (!hardwareBacked || image == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
       return null;
     }
     try {
-      return image.getHardwareBuffer();
+      return HardwareBufferApi.getHardwareBuffer(image);
     } catch (IllegalStateException ignored) {
       return null;
     }
@@ -114,6 +114,15 @@ final class SKAndroidNativeFrameJavaSide {
     if (image != null) {
       image.close();
       image = null;
+    }
+  }
+
+  @RequiresApi(Build.VERSION_CODES.Q)
+  private static final class HardwareBufferApi {
+    private HardwareBufferApi() {}
+
+    static Object getHardwareBuffer(Image image) {
+      return image.getHardwareBuffer();
     }
   }
 

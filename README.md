@@ -22,7 +22,7 @@ read back as RGBA8 on demand, encoded, previewed, and closed explicitly.
 
 On iOS the primary frame storage is a `CVPixelBuffer`. On Android 10 / API 29+
 NativeVideo seeks with `MediaExtractor`, decodes through `MediaCodec` into a
-PRIVATE `ImageReader`, and retains an independent `AHardwareBuffer` for the
+PRIVATE `ImageReader`, and retains the backing `Image` plus an `AHardwareBuffer` for the
 frame. Android keeps the established Bitmap fallback for older or incompatible
 decoders. Calling `arrayBuffer()`, PNG/base64, or the legacy frame view is an
 explicit CPU rasterization/readback path rather than the primary frame
