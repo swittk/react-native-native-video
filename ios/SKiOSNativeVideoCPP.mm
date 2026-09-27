@@ -40,7 +40,7 @@ NSURL *urlFromSource(const std::string &sourceUri) {
   NSString *source = [NSString stringWithUTF8String:sourceUri.c_str()];
   NSURL *url = [NSURL URLWithString:source];
   if (url != nil && url.scheme.length > 0) {
-    return url;
+    return url.isFileURL ? url : nil;
   }
   return [NSURL fileURLWithPath:source];
 }
@@ -98,21 +98,33 @@ SKiOSNativeVideoWrapper::~SKiOSNativeVideoWrapper() {
 
 bool SKiOSNativeVideoWrapper::loadVideoTrack() {
   dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+  AVURLAsset *loadingAsset = asset;
   __block NSArray<AVAssetTrack *> *tracks = nil;
   __block NSError *error = nil;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  [asset loadValuesAsynchronouslyForKeys:@[ @"tracks" ]
+  [loadingAsset loadValuesAsynchronouslyForKeys:@[ @"tracks" ]
                        completionHandler:^{
                          AVKeyValueStatus status =
-                             [asset statusOfValueForKey:@"tracks" error:&error];
+                             [loadingAsset statusOfValueForKey:@"tracks" error:&error];
                          if (status == AVKeyValueStatusLoaded) {
-                           tracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+                           tracks = [loadingAsset tracksWithMediaType:AVMediaTypeVideo];
                          }
                          dispatch_semaphore_signal(semaphore);
                        }];
 #pragma clang diagnostic pop
-  dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+  const dispatch_time_t timeout =
+      dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC);
+  if (dispatch_semaphore_wait(semaphore, timeout) != 0) {
+    lastError = [NSError
+        errorWithDomain:@"SKRNNativeVideo"
+                   code:408
+               userInfo:@{
+                 NSLocalizedDescriptionKey :
+                     @"Timed out while loading the local video track"
+               }];
+    return false;
+  }
 
   if (error != nil || tracks.count == 0) {
     lastError = error ?: [NSError
@@ -445,7 +457,13 @@ size_t SKiOSNativeFrameWrapper::bytesPerRow() const {
 }
 
 std::string SKiOSNativeFrameWrapper::base64(const std::string &requestedFormat) {
+  if (buffer == nullptr || !CMSampleBufferIsValid(buffer)) {
+    return {};
+  }
   CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(buffer);
+  if (imageBuffer == nullptr) {
+    return {};
+  }
   CIImage *image = [CIImage imageWithCVPixelBuffer:imageBuffer];
   image = [image imageByApplyingOrientation:toCGImageOrientation(orientation)];
   UIImage *uiImage = [UIImage imageWithCIImage:image];

@@ -76,7 +76,14 @@ export function multiply(a: number, b: number): Promise<number> {
  * supported by MediaMetadataRetriever.
  */
 export function openVideo(uri: string): NativeVideoWrapper {
-  const factory = globalThis.SKRNNativeVideoOpenVideo;
+  let factory = globalThis.SKRNNativeVideoOpenVideo;
+  if (typeof factory !== 'function') {
+    const legacyBinding = NativeVideoBinding as unknown as {
+      installBindings?: () => void;
+    };
+    legacyBinding.installBindings?.();
+    factory = globalThis.SKRNNativeVideoOpenVideo;
+  }
   if (typeof factory !== 'function') {
     throw new Error(
       "react-native-native-video's JSI bindings were not installed. " +

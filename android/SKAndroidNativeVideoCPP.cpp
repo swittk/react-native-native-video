@@ -370,6 +370,7 @@ SKAndroidNativeFrameWrapper::~SKAndroidNativeFrameWrapper() {
 }
 
 void SKAndroidNativeFrameWrapper::close() {
+  std::lock_guard<std::mutex> lock(bitmapMutex_);
   if (bitmap != nullptr && jvm_ != nullptr) {
     JniEnvironment environment(jvm_);
     if (environment) {
@@ -380,8 +381,14 @@ void SKAndroidNativeFrameWrapper::close() {
   setValid(false);
 }
 
+jobject SKAndroidNativeFrameWrapper::newBitmapGlobalRef(JNIEnv *env) const {
+  std::lock_guard<std::mutex> lock(bitmapMutex_);
+  return bitmap == nullptr || !valid_ ? nullptr : env->NewGlobalRef(bitmap);
+}
+
 SKRNSize SKAndroidNativeFrameWrapper::size() const {
-  if (!valid_) {
+  std::lock_guard<std::mutex> lock(bitmapMutex_);
+  if (!valid_ || bitmap == nullptr) {
     return {0, 0};
   }
   JniEnvironment environment(jvm_);
@@ -402,6 +409,10 @@ size_t SKAndroidNativeFrameWrapper::bytesPerRow() const {
 }
 
 std::string SKAndroidNativeFrameWrapper::base64(const std::string &format) {
+  std::lock_guard<std::mutex> lock(bitmapMutex_);
+  if (!valid_ || bitmap == nullptr) {
+    return {};
+  }
   JniEnvironment environment(jvm_);
   if (!environment) {
     return {};
@@ -424,6 +435,10 @@ std::string SKAndroidNativeFrameWrapper::base64(const std::string &format) {
 
 jsi::Value SKAndroidNativeFrameWrapper::arrayBufferValue(
     jsi::Runtime &runtime) {
+  std::lock_guard<std::mutex> lock(bitmapMutex_);
+  if (!valid_ || bitmap == nullptr) {
+    throw jsi::JSError(runtime, "Android frame is closed");
+  }
   JniEnvironment environment(jvm_);
   if (!environment) {
     throw jsi::JSError(runtime, "Unable to attach to the Android runtime");
@@ -463,8 +478,9 @@ jsi::Value SKAndroidNativeFrameWrapper::arrayBufferValue(
 
 } // namespace SKRNNativeVideo
 
-using AndroidFrameHolder =
-    std::shared_ptr<SKRNNativeVideo::SKAndroidNativeFrameWrapper>;
+struct AndroidFrameHolder {
+  jobject bitmap = nullptr;
+};
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_acquireNativeFrame(
@@ -475,27 +491,37 @@ Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_acquireNativeFrame(
       SKRNNativeVideo::SKAndroidNativeFrameWrapper>(
       SKRNNativeVideo::resolveNativeFrame(
           SKRNNativeVideo::stringFromJString(env, nativeId)));
-  if (!frame || !frame->isValid()) {
+  if (!frame) {
     return 0;
   }
-  return reinterpret_cast<jlong>(new AndroidFrameHolder(std::move(frame)));
+  jobject bitmap = frame->newBitmapGlobalRef(env);
+  if (bitmap == nullptr) {
+    return 0;
+  }
+  return reinterpret_cast<jlong>(new AndroidFrameHolder{bitmap});
 }
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_bitmapForNativeFrame(
-    JNIEnv *,
+    JNIEnv *env,
     jclass,
     jlong nativeFrame) {
   const auto *holder = reinterpret_cast<AndroidFrameHolder *>(nativeFrame);
-  return holder == nullptr || !*holder || !(*holder)->isValid()
+  return holder == nullptr || holder->bitmap == nullptr
       ? nullptr
-      : (*holder)->bitmap;
+      : env->NewLocalRef(holder->bitmap);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_releaseNativeFrame(
-    JNIEnv *,
+    JNIEnv *env,
     jclass,
     jlong nativeFrame) {
-  delete reinterpret_cast<AndroidFrameHolder *>(nativeFrame);
+  auto *holder = reinterpret_cast<AndroidFrameHolder *>(nativeFrame);
+  if (holder != nullptr) {
+    if (holder->bitmap != nullptr) {
+      env->DeleteGlobalRef(holder->bitmap);
+    }
+    delete holder;
+  }
 }

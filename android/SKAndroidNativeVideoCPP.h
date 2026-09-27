@@ -4,6 +4,7 @@
 #include <jni.h>
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "react-native-native-video.h"
@@ -37,10 +38,11 @@ class SKAndroidNativeFrameWrapper final : public SKNativeFrameWrapper {
   SKRNSize size() const override;
   size_t bytesPerRow() const override;
   std::string base64(const std::string &format) override;
-
-  jobject bitmap = nullptr;
+  jobject newBitmapGlobalRef(JNIEnv *env) const;
 
  private:
+  mutable std::mutex bitmapMutex_;
+  jobject bitmap = nullptr;
   JavaVM *jvm_ = nullptr;
 };
 

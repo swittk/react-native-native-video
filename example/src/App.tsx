@@ -49,6 +49,7 @@ export default function App(): React.JSX.Element {
   const autoSmokeEnabled = React.useRef(shouldAutoRunSmoke()).current;
   const autoSmokeInitialDone = React.useRef(false);
   const autoSmokeBackgrounded = React.useRef(false);
+  const autoSmokeInitialUri = React.useRef<string | null>(null);
   const autoSmokeResumeDone = React.useRef(false);
   const [sourceUri, setSourceUri] = React.useState('');
   const [manualUri, setManualUri] = React.useState(initialManualUri);
@@ -117,7 +118,9 @@ export default function App(): React.JSX.Element {
     try {
       const result = await DocumentPicker.pickSingle({
         type: DocumentPicker.types.video,
-        copyTo: 'cachesDirectory',
+        ...(Platform.OS === 'ios'
+          ? {copyTo: 'cachesDirectory' as const}
+          : {}),
       });
       const source =
         Platform.OS === 'ios' ? result.fileCopyUri ?? result.uri : result.uri;
@@ -178,7 +181,8 @@ export default function App(): React.JSX.Element {
       return;
     }
     const requestedIndex = Number.parseInt(frameIndexText, 10);
-    const start = Number.isFinite(requestedIndex) ? requestedIndex : 0;
+    const parsedStart = Number.isFinite(requestedIndex) ? requestedIndex : 0;
+    const start = Math.max(0, Math.min(opened.numFrames - 1, parsedStart));
     const decoded = opened.getFramesAtIndex(start, 3);
     if (decoded.length === 0) {
       setStatus('Batch decode returned no frames.');
@@ -219,6 +223,7 @@ export default function App(): React.JSX.Element {
     if (!uri) {
       throw new Error('NativeVideoSmokeURI is required for auto smoke.');
     }
+    autoSmokeInitialUri.current = uri;
     openSelectedVideo(uri);
     const opened = videoRef.current;
     if (!opened || opened.numFrames < 1) {
@@ -266,7 +271,10 @@ export default function App(): React.JSX.Element {
       exerciseDecodedFrame(opened, index),
     );
 
-    const uri = manualUri.trim();
+    const uri = autoSmokeInitialUri.current;
+    if (!uri) {
+      throw new Error('Auto smoke lost the original video URI.');
+    }
     closeVideo();
     openSelectedVideo(uri);
     const reopened = videoRef.current;
@@ -313,8 +321,11 @@ export default function App(): React.JSX.Element {
       return;
     }
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState !== 'active') {
+      if (nextState === 'background') {
         autoSmokeBackgrounded.current = true;
+        return;
+      }
+      if (nextState !== 'active') {
         return;
       }
       if (

@@ -76,6 +76,10 @@ RCT_EXPORT_METHOD(multiply:(nonnull NSNumber *)a
   _invalidated = NO;
   _installedRuntime = nullptr;
   [[NSNotificationCenter defaultCenter]
+      removeObserver:self
+                name:RCTJavaScriptDidLoadNotification
+              object:nil];
+  [[NSNotificationCenter defaultCenter]
       addObserver:self
          selector:@selector(javaScriptDidLoad:)
              name:RCTJavaScriptDidLoadNotification
@@ -117,6 +121,12 @@ RCT_EXPORT_METHOD(multiply:(nonnull NSNumber *)a
         return std::make_shared<SKiOSNativeVideoWrapper>(path);
       });
   _installedRuntime = runtime;
+}
+
+RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(installBindings)
+{
+  [self installLegacyJSIBindingsIfReady];
+  return @YES;
 }
 
 - (void)invalidate

@@ -301,7 +301,11 @@ final class SKNativeVideoWrapperJavaSide {
             duration = format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0;
           }
           if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
-            frameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
+            try {
+              frameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
+            } catch (ClassCastException notInteger) {
+              frameRate = format.getFloat(MediaFormat.KEY_FRAME_RATE);
+            }
           }
           break;
         }
