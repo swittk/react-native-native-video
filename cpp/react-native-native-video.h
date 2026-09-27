@@ -82,6 +82,8 @@ class SKNativeFrameWrapper
    * The pointer is borrowed; callers must hold a NativeBuffer lease.
    */
   virtual void *nativeBufferPointer() const { return nullptr; }
+  virtual void *retainNativeBufferPointer() const { return nullptr; }
+  virtual void releaseNativeBufferPointer(void *) const {}
   virtual void close() {}
   virtual facebook::jsi::Value arrayBufferValue(
       facebook::jsi::Runtime &) {
@@ -143,11 +145,11 @@ class SKNativeVideoWrapper
 #endif
 
 /**
- * Stable C ABI for companion native adapters. A lease retains the underlying
- * NativeFrame HostObject while a consumer imports its native buffer.
+ * Stable C ABI for companion native adapters. A lease retains both the
+ * NativeFrame HostObject and an independent platform-native buffer reference.
  *
- * The returned native-buffer pointer is borrowed from the lease. Consumers
- * should import/copy/wrap it synchronously, then release the lease.
+ * The returned native-buffer pointer is owned by the lease and remains valid
+ * even if the source NativeFrame is closed before the lease is released.
  */
 extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
 SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId);

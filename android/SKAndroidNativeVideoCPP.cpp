@@ -449,6 +449,22 @@ void *SKAndroidNativeFrameWrapper::nativeBufferPointer() const {
   return valid_ ? static_cast<void *>(hardwareBuffer_) : nullptr;
 }
 
+void *SKAndroidNativeFrameWrapper::retainNativeBufferPointer() const {
+  std::lock_guard<std::mutex> lock(frameMutex_);
+  if (!valid_ || hardwareBuffer_ == nullptr || hardwareBufferAcquire == nullptr) {
+    return nullptr;
+  }
+  hardwareBufferAcquire(hardwareBuffer_);
+  return static_cast<void *>(hardwareBuffer_);
+}
+
+void SKAndroidNativeFrameWrapper::releaseNativeBufferPointer(
+    void *buffer) const {
+  if (buffer != nullptr && hardwareBufferRelease != nullptr) {
+    hardwareBufferRelease(static_cast<AHardwareBuffer *>(buffer));
+  }
+}
+
 void SKAndroidNativeFrameWrapper::close() {
   std::lock_guard<std::mutex> lock(frameMutex_);
   if (!valid_ && javaFrame_ == nullptr && hardwareBuffer_ == nullptr) {

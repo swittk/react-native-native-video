@@ -132,7 +132,7 @@ SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId) {
   if (!frame || !frame->isValid()) {
     return nullptr;
   }
-  void *buffer = frame->nativeBufferPointer();
+  void *buffer = frame->retainNativeBufferPointer();
   if (buffer == nullptr) {
     return nullptr;
   }
@@ -158,7 +158,12 @@ SKRNNativeVideoNativeBufferLeaseGetType(void *opaqueLease) {
 
 extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void
 SKRNNativeVideoReleaseNativeBufferLease(void *opaqueLease) {
-  delete static_cast<NativeBufferLease *>(opaqueLease);
+  auto *lease = static_cast<NativeBufferLease *>(opaqueLease);
+  if (lease == nullptr) {
+    return;
+  }
+  lease->frame->releaseNativeBufferPointer(lease->buffer);
+  delete lease;
 }
 
 jsi::Value SKNativeVideoWrapper::get(

@@ -28,6 +28,8 @@ class SKiOSNativeFrameWrapper final : public SKNativeFrameWrapper {
   std::string platform() const override { return "iOS"; }
   std::string nativeBufferType() const override { return "cvPixelBuffer"; }
   void *nativeBufferPointer() const override;
+  void *retainNativeBufferPointer() const override;
+  void releaseNativeBufferPointer(void *buffer) const override;
   void close() override;
   facebook::jsi::Value arrayBufferValue(
       facebook::jsi::Runtime &runtime) override;
