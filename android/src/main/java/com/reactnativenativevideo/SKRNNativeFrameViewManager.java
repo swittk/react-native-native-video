@@ -1,5 +1,6 @@
 package com.reactnativenativevideo;
 
+import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
 import android.widget.ImageView;
 
@@ -64,6 +65,7 @@ final class SKRNNativeFrameViewManager
     super.onDropViewInstance(view);
   }
 
+  @SuppressLint({"AppCompatCustomView", "ViewConstructor"})
   static final class NativeFrameImageView extends ImageView {
     @Nullable private String nativeFrameId;
     private long nativeFrame = 0;

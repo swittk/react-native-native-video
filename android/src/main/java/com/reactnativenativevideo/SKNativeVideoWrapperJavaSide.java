@@ -17,6 +17,7 @@ import android.os.HandlerThread;
 import android.util.Base64;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.facebook.proguard.annotations.DoNotStrip;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -86,7 +87,7 @@ final class SKNativeVideoWrapperJavaSide {
     int displayHeight = getHeight();
 
     HardwareFrameDecoder decoder = hardwareDecoder;
-    if (decoder != null) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && decoder != null) {
       try {
         Image image = decoder.decodeFrameAtTimestampUs(timestampUs);
         if (image != null) {
@@ -207,7 +208,7 @@ final class SKNativeVideoWrapperJavaSide {
     closed = true;
     HardwareFrameDecoder decoder = hardwareDecoder;
     hardwareDecoder = null;
-    if (decoder != null) decoder.close();
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && decoder != null) decoder.close();
     try {
       mediaRetriever.release();
     } catch (Exception ignored) {
@@ -357,6 +358,7 @@ final class SKNativeVideoWrapperJavaSide {
     try { return Double.parseDouble(value); } catch (NumberFormatException ignored) { return fallback; }
   }
 
+  @RequiresApi(Build.VERSION_CODES.Q)
   private static final class HardwareFrameDecoder {
     private static final long CODEC_TIMEOUT_US = 10_000;
     private static final long IMAGE_TIMEOUT_MS = 500;
