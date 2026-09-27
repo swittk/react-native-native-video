@@ -81,8 +81,12 @@ export default function App(): React.JSX.Element {
 
   React.useEffect(
     () => () => {
-      frameRef.current?.close();
-      videoRef.current?.close();
+      const frameToClose = frameRef.current;
+      const videoToClose = videoRef.current;
+      frameRef.current = undefined;
+      videoRef.current = undefined;
+      frameToClose?.close();
+      videoToClose?.close();
     },
     [],
   );
@@ -138,7 +142,7 @@ export default function App(): React.JSX.Element {
   const decodeFrameAtIndex = React.useCallback(
     (requestedIndex: number) => {
       const opened = videoRef.current;
-      if (!opened || opened.numFrames < 1) {
+      if (!opened || !opened.isValid || opened.numFrames < 1) {
         return;
       }
       const index = Math.max(0, Math.min(opened.numFrames - 1, requestedIndex));
@@ -159,7 +163,7 @@ export default function App(): React.JSX.Element {
   /** Uses the presentation-time index and time-based decode APIs together. */
   const decodeMiddleTime = React.useCallback(() => {
     const opened = videoRef.current;
-    if (!opened || opened.numFrames < 1) {
+    if (!opened || !opened.isValid || opened.numFrames < 1) {
       return;
     }
     const time = opened.duration / 2;
@@ -177,7 +181,7 @@ export default function App(): React.JSX.Element {
   /** Retains many native frames at once, seeks non-monotonically, then forces one CPU readback. */
   const stressNativeFrames = React.useCallback(() => {
     const opened = videoRef.current;
-    if (!opened || opened.numFrames < 1) {
+    if (!opened || !opened.isValid || opened.numFrames < 1) {
       return;
     }
 
@@ -223,7 +227,7 @@ export default function App(): React.JSX.Element {
   /** Exercises batch decoding while retaining one frame for native preview. */
   const decodeBatch = React.useCallback(() => {
     const opened = videoRef.current;
-    if (!opened || opened.numFrames < 1) {
+    if (!opened || !opened.isValid || opened.numFrames < 1) {
       return;
     }
     const requestedIndex = Number.parseInt(frameIndexText, 10);
@@ -272,7 +276,7 @@ export default function App(): React.JSX.Element {
     autoSmokeInitialUri.current = uri;
     openSelectedVideo(uri);
     const opened = videoRef.current;
-    if (!opened || opened.numFrames < 1) {
+    if (!opened || !opened.isValid || opened.numFrames < 1) {
       throw new Error('Auto smoke could not open the video.');
     }
 
@@ -309,7 +313,7 @@ export default function App(): React.JSX.Element {
 
   const runResumeAutoSmoke = React.useCallback(() => {
     const opened = videoRef.current;
-    if (!opened || opened.numFrames < 1) {
+    if (!opened || !opened.isValid || opened.numFrames < 1) {
       throw new Error('Auto smoke resume lost the open video.');
     }
 
@@ -394,7 +398,11 @@ export default function App(): React.JSX.Element {
   }, [autoSmokeEnabled, runResumeAutoSmoke]);
 
   const requestedIndex = Number.parseInt(frameIndexText, 10);
-  const sliderMaximum = Math.max(0, (video?.numFrames ?? 1) - 1);
+  const validVideo = video?.isValid ? video : undefined;
+  const videoReady = Boolean(validVideo);
+  const sliderMaximum = validVideo
+    ? Math.max(0, validVideo.numFrames - 1)
+    : 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -423,24 +431,24 @@ export default function App(): React.JSX.Element {
         <Text selectable style={styles.uri}>
           {sourceUri || 'No video selected'}
         </Text>
-        {video ? (
+        {validVideo ? (
           <Text style={styles.metadata}>
-            {`${video.size.width}×${video.size.height} • ${video.duration.toFixed(
+            {`${validVideo.size.width}×${validVideo.size.height} • ${validVideo.duration.toFixed(
               3,
-            )}s • ${video.numFrames} frames • ${video.frameRate.toFixed(3)} fps`}
+            )}s • ${validVideo.numFrames} frames • ${validVideo.frameRate.toFixed(3)} fps`}
           </Text>
         ) : null}
 
         <TextInput
           accessibilityLabel="Frame index"
-          editable={Boolean(video)}
+          editable={videoReady}
           keyboardType="number-pad"
           onChangeText={setFrameIndexText}
           style={styles.input}
           value={frameIndexText}
         />
         <Slider
-          disabled={!video}
+          disabled={!videoReady}
           maximumValue={sliderMaximum}
           minimumValue={0}
           onSlidingComplete={value => decodeFrameAtIndex(Math.floor(value))}
@@ -454,34 +462,34 @@ export default function App(): React.JSX.Element {
         <View style={styles.buttonGap}>
           <Button
             accessibilityLabel="Decode frame at index"
-            disabled={!video}
+            disabled={!videoReady}
             title="Decode frame at index"
             onPress={() => decodeFrameAtIndex(requestedIndex || 0)}
           />
         </View>
         <View style={styles.buttonGap}>
-          <Button accessibilityLabel="Decode middle timestamp" disabled={!video} title="Decode middle timestamp" onPress={decodeMiddleTime} />
+          <Button accessibilityLabel="Decode middle timestamp" disabled={!videoReady} title="Decode middle timestamp" onPress={decodeMiddleTime} />
         </View>
         <View style={styles.buttonGap}>
-          <Button accessibilityLabel="Decode three-frame batch" disabled={!video} title="Decode three-frame batch" onPress={decodeBatch} />
+          <Button accessibilityLabel="Decode three-frame batch" disabled={!videoReady} title="Decode three-frame batch" onPress={decodeBatch} />
         </View>
         <View style={styles.buttonGap}>
           <Button
-            disabled={!video}
+            disabled={!videoReady}
             title="Stress retained native frames"
             onPress={stressNativeFrames}
           />
         </View>
 
         <NativeVideoFrameView
-          frameData={frame}
+          frameData={frame?.isValid ? frame : undefined}
           resizeMode="contain"
           style={styles.preview}
         />
         <Text selectable style={styles.status}>
           {status}
         </Text>
-        <Button accessibilityLabel="Close native resources" disabled={!video} title="Close native resources" onPress={closeVideo} />
+        <Button accessibilityLabel="Close native resources" disabled={!videoReady} title="Close native resources" onPress={closeVideo} />
       </ScrollView>
     </SafeAreaView>
   );
