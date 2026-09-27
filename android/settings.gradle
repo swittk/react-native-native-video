@@ -1,0 +1,14 @@
+pluginManagement {
+  includeBuild("../node_modules/@react-native/gradle-plugin")
+  repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+}
+
+rootProject.name = "react-native-native-video-android"
+
+// Also substitute the buildscript classpath coordinate used by the library's
+// standalone validation build. Consumer apps already provide this include.
+includeBuild("../node_modules/@react-native/gradle-plugin")

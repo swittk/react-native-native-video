@@ -1,74 +1,127 @@
 import React from 'react';
-import { NativeModules, Platform, requireNativeComponent, StyleProp, ViewStyle } from 'react-native';
+import {
+  requireNativeComponent,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
 
-const LINKING_ERROR =
-  `The package 'react-native-native-video' doesn't seem to be linked. Make sure: \n\n` +
-  Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
-  '- You rebuilt the app after installing the package\n' +
-  '- You are not using Expo managed workflow\n';
+import NativeVideoBinding from './NativeVideo';
 
-const NativeVideo = NativeModules.NativeVideo
-  ? NativeModules.NativeVideo
-  : new Proxy(
-    {},
-    {
-      get() {
-        throw new Error(LINKING_ERROR);
-      },
-    }
-  );
-
-export function multiply(a: number, b: number): Promise<number> {
-  return NativeVideo.multiply(a, b);
+declare global {
+  // New Architecture uses the supported platform binding installers. Legacy
+  // bridge modules install the same HostObject factory from their RN runtime.
+  // eslint-disable-next-line no-var
+  var SKRNNativeVideoOpenVideo:
+    | ((uri: string) => NativeVideoWrapper)
+    | undefined;
 }
 
-export function openVideo(url: string): NativeVideoWrapper {
-  return (global as any).SKRNNativeVideoOpenVideo(url);
-}
+export type NativeVideoSize = Readonly<{
+  width: number;
+  height: number;
+}>;
 
 export interface NativeFrameWrapper {
-  /**
-   * Returns RGBA32 (8 bytes per pixel) UInt8 data.
-   * TODO: Allow other formats to be specified
-   */
+  /** A tightly packed, display-oriented RGBA8 frame (4 bytes per pixel). */
   arrayBuffer(): ArrayBuffer;
-  size: { width: number, height: number };
-  isValid: boolean;
-  /** Currently iOS only */
-  resizeMode?: 'contain' | 'cover' | 'stretch';
-  /** Call this to free the frame once it gets unused; call it if memory is very crucial */
+  readonly size: NativeVideoSize;
+  readonly bytesPerRow: number;
+  readonly pixelFormat: 'rgba8';
+  readonly platform: 'iOS' | 'Android';
+  /** Primary decoded storage; CPU RGBA is produced lazily by arrayBuffer(). */
+  readonly nativeBufferType: 'cvPixelBuffer' | 'hardwareBuffer' | 'bitmap' | 'unknown';
+  readonly isValid: boolean;
+  /** Zero-based decoded frame index. */
+  readonly index: number;
+  /** Presentation timestamp in seconds. */
+  readonly timestamp: number;
+  /** Opaque, lifetime-safe identifier used by the native preview view. */
+  readonly nativeId: string;
+  /** @deprecated Compatibility alias of nativeId; this is no longer a pointer. */
+  readonly nativePtrStr: string;
+  /** Releases the decoded native frame. Safe to call more than once. */
   close(): void;
-  base64(opts?: { format?: 'png' | 'jpg' }): string;
-
-  // BETA: MD5 hash of the frame, however, it's not the same across platforms & not the same as in FFMPEG yet
+  base64(opts?: { format?: 'png' | 'jpg' | 'jpeg' }): string;
+  /** MD5 of raw RGBA8 bytes. Android currently returns an empty string. */
   md5(): string;
 }
 
 export interface NativeVideoWrapper {
-  sourceUri: string;
-  isValid: boolean;
-  /** Duration in seconds */
-  duration: number;
-  numFrames: number;
-  frameRate: number;
-  size: { width: number, height: number };
-  getFrameAtIndex(idx: number): NativeFrameWrapper;
-  getFramesAtIndex(idx: number, len: number): NativeFrameWrapper[];
-  getFrameAtTime(time: number): NativeFrameWrapper;
-  /** Call this to free the video once it gets unused; call it if memory is very crucial */
+  readonly sourceUri: string;
+  readonly isValid: boolean;
+  /** Duration in seconds. */
+  readonly duration: number;
+  readonly numFrames: number;
+  /** Average/nominal frames per second. */
+  readonly frameRate: number;
+  /** Display-oriented dimensions. */
+  readonly size: NativeVideoSize;
+  /** Exact PTS when available; otherwise a nominal FPS-derived timestamp. */
+  getFrameTimestampAtIndex(index: number): number;
+  /** Selects the frame at or immediately before this presentation time. */
+  getFrameIndexAtTime(timeSeconds: number): number;
+  getFrameAtIndex(index: number): NativeFrameWrapper;
+  getFramesAtIndex(index: number, length: number): NativeFrameWrapper[];
+  getFrameAtTime(timeSeconds: number): NativeFrameWrapper;
+  /** Releases decoder resources. Safe to call more than once. */
   close(): void;
 }
 
-const SKRNNativeFrameView = requireNativeComponent<NativeVideoFrameViewProps>('SKRNNativeFrameView');
+/** Compatibility helper retained from the original package. */
+export function multiply(a: number, b: number): Promise<number> {
+  return Promise.resolve(NativeVideoBinding.multiply(a, b));
+}
 
-type NativeVideoFrameViewProps = { frameData?: NativeFrameWrapper, style?: StyleProp<ViewStyle> };
-type NativeVideoFrameViewState = {};
-export class NativeVideoFrameView extends React.PureComponent<NativeVideoFrameViewProps, NativeVideoFrameViewState> {
-  render() {
-    const { frameData, style } = this.props;
-    return <SKRNNativeFrameView
-      frameData={frameData}
-      style={style}
-    />
+/**
+ * Opens a native decoder synchronously and returns a C++ HostObject. The URI
+ * must identify a local file on iOS; Android additionally accepts data sources
+ * supported by MediaMetadataRetriever.
+ */
+export function openVideo(uri: string): NativeVideoWrapper {
+  let factory = globalThis.SKRNNativeVideoOpenVideo;
+  if (typeof factory !== 'function') {
+    const legacyBinding = NativeVideoBinding as unknown as {
+      installBindings?: () => void;
+    };
+    legacyBinding.installBindings?.();
+    factory = globalThis.SKRNNativeVideoOpenVideo;
+  }
+  if (typeof factory !== 'function') {
+    throw new Error(
+      "react-native-native-video's JSI bindings were not installed. " +
+        'Rebuild the native app and verify that NativeVideo is linked.'
+    );
+  }
+  return factory(uri);
+}
+
+type NativeVideoFrameNativeProps = {
+  frameId?: string;
+  resizeMode?: 'contain' | 'cover' | 'stretch';
+  style?: StyleProp<ViewStyle>;
+};
+
+const SKRNNativeFrameView =
+  requireNativeComponent<NativeVideoFrameNativeProps>('SKRNNativeFrameView');
+
+export type NativeVideoFrameViewProps = Readonly<{
+  frameData?: NativeFrameWrapper;
+  resizeMode?: 'contain' | 'cover' | 'stretch';
+  style?: StyleProp<ViewStyle>;
+}>;
+
+/**
+ * Lightweight native preview. Frame extraction and raw access do not depend
+ * on this compatibility view.
+ */
+export class NativeVideoFrameView extends React.PureComponent<NativeVideoFrameViewProps> {
+  render(): React.ReactNode {
+    const { frameData, ...props } = this.props;
+    return (
+      <SKRNNativeFrameView
+        {...props}
+        frameId={frameData?.nativeId}
+      />
+    );
   }
 }

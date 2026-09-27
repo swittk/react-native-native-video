@@ -1,263 +1,634 @@
-//
-// Created by Switt Kongdachalert on 5/1/2022 AD.
-//
-
 #include "SKAndroidNativeVideoCPP.h"
-#include <jni.h>
 
-using namespace SKRNNativeVideo;
+#include <android/bitmap.h>
+#include <android/hardware_buffer.h>
+#include <android/hardware_buffer_jni.h>
+#include <dlfcn.h>
+
+#include <cstring>
+#include <utility>
+
+using namespace facebook;
+
 namespace SKRNNativeVideo {
-    jclass NativeVideoWrapperJavaSideClass = 0;
-    jmethodID NativeVideoWrapperJavaGetFrameAtIndexMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetFramesAtIndexMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetFrameAtTimeMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetNumFramesMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetFrameRateMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetDurationMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetWidthMethod = 0;
-    jmethodID NativeVideoWrapperJavaGetHeightMethod = 0;
-    jmethodID NativeVideoWrapperJavaSideClassConstructor = 0;
-    jmethodID NativeVideoWrapperJavaSideBase64ForBitmapMethod = 0; // Static
-    jmethodID NativeVideoWrapperJavaSideRGBABytesForBitmapMethod = 0; // Static
+namespace {
 
-    jmethodID BitmapGetWidthMethod = 0;
-    jmethodID BitmapGetHeightMethod = 0;
-    jclass BitmapClassRef = 0;
+jclass nativeVideoModuleClass = nullptr;
+jmethodID createVideoWrapperMethod = nullptr;
 
-    jclass java_util_List;
-    jmethodID java_util_List_;
-    jmethodID java_util_List_size;
-    jmethodID java_util_List_get;
-    jmethodID java_util_List_add;
+jclass videoWrapperClass = nullptr;
+jclass frameWrapperClass = nullptr;
+jmethodID getFrameAtIndexMethod = nullptr;
+jmethodID getFramesAtIndexMethod = nullptr;
+jmethodID getNumFramesMethod = nullptr;
+jmethodID getFrameRateMethod = nullptr;
+jmethodID getDurationMethod = nullptr;
+jmethodID getWidthMethod = nullptr;
+jmethodID getHeightMethod = nullptr;
+jmethodID getFrameTimestampAtIndexMethod = nullptr;
+jmethodID getFrameIndexAtTimeMethod = nullptr;
+jmethodID closeVideoMethod = nullptr;
+jmethodID base64ForBitmapMethod = nullptr;
+
+jmethodID frameGetBitmapMethod = nullptr;
+jmethodID frameGetHardwareBufferMethod = nullptr;
+jmethodID frameGetWidthMethod = nullptr;
+jmethodID frameGetHeightMethod = nullptr;
+jmethodID frameCloseMethod = nullptr;
+
+using HardwareBufferFromJavaFn = AHardwareBuffer *(*)(JNIEnv *, jobject);
+using HardwareBufferAcquireFn = void (*)(AHardwareBuffer *);
+using HardwareBufferReleaseFn = void (*)(AHardwareBuffer *);
+
+HardwareBufferFromJavaFn hardwareBufferFromJava = nullptr;
+HardwareBufferAcquireFn hardwareBufferAcquire = nullptr;
+HardwareBufferReleaseFn hardwareBufferRelease = nullptr;
+
+void initializeHardwareBufferBindings() {
+  void *libandroid = dlopen("libandroid.so", RTLD_NOW | RTLD_LOCAL);
+  if (libandroid == nullptr) {
+    return;
+  }
+  hardwareBufferFromJava = reinterpret_cast<HardwareBufferFromJavaFn>(
+      dlsym(libandroid, "AHardwareBuffer_fromHardwareBuffer"));
+  hardwareBufferAcquire = reinterpret_cast<HardwareBufferAcquireFn>(
+      dlsym(libandroid, "AHardwareBuffer_acquire"));
+  hardwareBufferRelease = reinterpret_cast<HardwareBufferReleaseFn>(
+      dlsym(libandroid, "AHardwareBuffer_release"));
 }
 
-static std::string jstring2string(JNIEnv *env, jstring jStr);
+jclass listClass = nullptr;
+jmethodID listSizeMethod = nullptr;
+jmethodID listGetMethod = nullptr;
 
-// Adapted from here https://stackoverflow.com/a/16668081/4469172
-// Don't forget to free()!
-static unsigned char* jbyteArray_createUnsignedCharArray(JNIEnv *env, jbyteArray array) {
-    int len = env->GetArrayLength (array);
-    unsigned char* buf = (unsigned char *)malloc(len);
-    env->GetByteArrayRegion (array, 0, len, reinterpret_cast<jbyte*>(buf));
-    return buf;
-}
-static jbyteArray jbyteArray_createFromByteArray(JNIEnv *env, unsigned char* buf, int len) {
-    jbyteArray array = env->NewByteArray (len);
-    env->SetByteArrayRegion (array, 0, len, reinterpret_cast<jbyte*>(buf));
-    return array;
+class JniEnvironment final {
+ public:
+  explicit JniEnvironment(JavaVM *jvm) : jvm_(jvm) {
+    const jint result =
+        jvm_->GetEnv(reinterpret_cast<void **>(&env_), JNI_VERSION_1_6);
+    if (result == JNI_EDETACHED &&
+        jvm_->AttachCurrentThread(&env_, nullptr) == JNI_OK) {
+      attached_ = true;
+    }
+  }
+
+  ~JniEnvironment() {
+    if (attached_) {
+      jvm_->DetachCurrentThread();
+    }
+  }
+
+  JNIEnv *get() const { return env_; }
+  explicit operator bool() const { return env_ != nullptr; }
+
+ private:
+  JavaVM *jvm_ = nullptr;
+  JNIEnv *env_ = nullptr;
+  bool attached_ = false;
+};
+
+bool clearPendingException(JNIEnv *env) {
+  if (!env->ExceptionCheck()) {
+    return false;
+  }
+  env->ExceptionClear();
+  return true;
 }
 
-// TODO: I have no idea if JNIEnv * is safe to be stored in classes; if anyone knows better please make pull requests or something
+jclass globalClass(JNIEnv *env, const char *name) {
+  jclass local = env->FindClass(name);
+  if (local == nullptr) {
+    clearPendingException(env);
+    return nullptr;
+  }
+  jclass global = static_cast<jclass>(env->NewGlobalRef(local));
+  env->DeleteLocalRef(local);
+  return global;
+}
+
+std::string stringFromJString(JNIEnv *env, jstring value) {
+  if (value == nullptr) {
+    return {};
+  }
+  const char *characters = env->GetStringUTFChars(value, nullptr);
+  if (characters == nullptr) {
+    clearPendingException(env);
+    return {};
+  }
+  std::string result(characters);
+  env->ReleaseStringUTFChars(value, characters);
+  return result;
+}
+
+} // namespace
+
+void initializeJavaBindings(JNIEnv *env) {
+  nativeVideoModuleClass =
+      globalClass(env, "com/reactnativenativevideo/NativeVideoModule");
+  videoWrapperClass = globalClass(
+      env, "com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
+  frameWrapperClass = globalClass(
+      env, "com/reactnativenativevideo/SKAndroidNativeFrameJavaSide");
+  listClass = globalClass(env, "java/util/List");
+  initializeHardwareBufferBindings();
+
+  createVideoWrapperMethod = env->GetMethodID(
+      nativeVideoModuleClass,
+      "createVideoWrapper",
+      "(Ljava/lang/String;)Lcom/reactnativenativevideo/SKNativeVideoWrapperJavaSide;");
+  getFrameAtIndexMethod = env->GetMethodID(
+      videoWrapperClass,
+      "getFrameAtIndex",
+      "(I)Lcom/reactnativenativevideo/SKAndroidNativeFrameJavaSide;");
+  getFramesAtIndexMethod = env->GetMethodID(
+      videoWrapperClass, "getFramesAtIndex", "(II)Ljava/util/List;");
+  getNumFramesMethod =
+      env->GetMethodID(videoWrapperClass, "getNumFrames", "()I");
+  getFrameRateMethod =
+      env->GetMethodID(videoWrapperClass, "getFrameRate", "()D");
+  getDurationMethod =
+      env->GetMethodID(videoWrapperClass, "getDuration", "()D");
+  getWidthMethod = env->GetMethodID(videoWrapperClass, "getWidth", "()I");
+  getHeightMethod = env->GetMethodID(videoWrapperClass, "getHeight", "()I");
+  getFrameTimestampAtIndexMethod = env->GetMethodID(
+      videoWrapperClass, "getFrameTimestampAtIndex", "(I)D");
+  getFrameIndexAtTimeMethod = env->GetMethodID(
+      videoWrapperClass, "getFrameIndexAtTime", "(D)I");
+  closeVideoMethod = env->GetMethodID(videoWrapperClass, "close", "()V");
+  base64ForBitmapMethod = env->GetStaticMethodID(
+      videoWrapperClass,
+      "base64StringForBitmap",
+      "(Landroid/graphics/Bitmap;Ljava/lang/String;)Ljava/lang/String;");
+
+  frameGetBitmapMethod =
+      env->GetMethodID(frameWrapperClass, "getBitmap", "()Landroid/graphics/Bitmap;");
+  frameGetHardwareBufferMethod = env->GetMethodID(
+      frameWrapperClass, "getHardwareBuffer", "()Ljava/lang/Object;");
+  frameGetWidthMethod =
+      env->GetMethodID(frameWrapperClass, "getWidth", "()I");
+  frameGetHeightMethod =
+      env->GetMethodID(frameWrapperClass, "getHeight", "()I");
+  frameCloseMethod =
+      env->GetMethodID(frameWrapperClass, "close", "()V");
+
+  listSizeMethod = env->GetMethodID(listClass, "size", "()I");
+  listGetMethod =
+      env->GetMethodID(listClass, "get", "(I)Ljava/lang/Object;");
+}
+
+AndroidModuleState::AndroidModuleState(
+    JNIEnv *env,
+    jobject nativeVideoModule) {
+  env->GetJavaVM(&jvm);
+  module = env->NewGlobalRef(nativeVideoModule);
+}
+
+AndroidModuleState::~AndroidModuleState() {
+  if (jvm == nullptr || module == nullptr) {
+    return;
+  }
+  JniEnvironment environment(jvm);
+  if (environment) {
+    environment.get()->DeleteGlobalRef(module);
+  }
+  module = nullptr;
+}
+
 SKAndroidNativeVideoWrapper::SKAndroidNativeVideoWrapper(
-        std::string sourceUri,
-        JavaVM* _vm
-) : SKNativeVideoWrapper(sourceUri), jvm(_vm) {
-    printf("about to init listHelper");
-    printf("about to get jnienv");
-    JNIEnv *env = getJNIEnv();
-    initListHelper(env);
-    printf("got jnienv %d", env);
-    printf("found class");
-    printf("got constructor");
-    // The MediaMetadataRetriever wrapper object
-    jstring stringUri = env->NewStringUTF(sourceUri.c_str());
-    jobject obj = env->NewObject(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideClassConstructor, stringUri);
-    printf("got jobj");
-    javaVideoWrapper = env->NewGlobalRef(obj);
-    printf("got javavideowrapper");
-    setValid(true);
-    clearJNIEnv();
-//    env->Call
-//    env->GetObjectClass();
+    const std::string &sourceUri,
+    std::shared_ptr<AndroidModuleState> moduleState)
+    : SKNativeVideoWrapper(sourceUri), moduleState_(std::move(moduleState)) {
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return;
+  }
+  JNIEnv *env = environment.get();
+  jstring uri = env->NewStringUTF(sourceUri.c_str());
+  jobject localWrapper = env->CallObjectMethod(
+      moduleState_->module, createVideoWrapperMethod, uri);
+  env->DeleteLocalRef(uri);
+  if (clearPendingException(env) || localWrapper == nullptr) {
+    return;
+  }
+  javaVideoWrapper_ = env->NewGlobalRef(localWrapper);
+  env->DeleteLocalRef(localWrapper);
+  setValid(javaVideoWrapper_ != nullptr);
 }
+
 SKAndroidNativeVideoWrapper::~SKAndroidNativeVideoWrapper() {
-    close();
+  close();
 }
 
 void SKAndroidNativeVideoWrapper::close() {
-    if(javaVideoWrapper != nullptr) {
-        // TODO: Cleanup
-        JNIEnv *env = getJNIEnv();
-        setValid(false);
-        env->DeleteGlobalRef(javaVideoWrapper);
-        javaVideoWrapper = nullptr;
-        clearJNIEnv();
-    }
+  if (javaVideoWrapper_ == nullptr || moduleState_ == nullptr) {
+    setValid(false);
+    return;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (environment) {
+    JNIEnv *env = environment.get();
+    env->CallVoidMethod(javaVideoWrapper_, closeVideoMethod);
+    clearPendingException(env);
+    env->DeleteGlobalRef(javaVideoWrapper_);
+  }
+  javaVideoWrapper_ = nullptr;
+  setValid(false);
 }
 
 std::shared_ptr<SKNativeFrameWrapper>
 SKAndroidNativeVideoWrapper::getFrameAtIndex(int index) {
-    JNIEnv *env = getJNIEnv();
-    // According to https://stackoverflow.com/a/2093300/4469172, I should not reuse jclass, but `jmethodID`s are reusable.
-    jobject bitmap = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameAtIndexMethod, index);
-    clearJNIEnv();
-    return std::make_shared<SKAndroidNativeFrameWrapper>(jvm, bitmap);
-};
+  const int frameCount = numFrames();
+  if (!valid_ || index < 0 || index >= frameCount) {
+    return nullptr;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return nullptr;
+  }
+  JNIEnv *env = environment.get();
+  jobject javaFrame =
+      env->CallObjectMethod(javaVideoWrapper_, getFrameAtIndexMethod, index);
+  if (clearPendingException(env) || javaFrame == nullptr) {
+    return nullptr;
+  }
+  auto result = std::make_shared<SKAndroidNativeFrameWrapper>(
+      moduleState_->jvm,
+      env,
+      javaFrame,
+      index,
+      frameTimestampAtIndex(index));
+  env->DeleteLocalRef(javaFrame);
+  return result;
+}
 
 std::vector<std::shared_ptr<SKNativeFrameWrapper>>
-SKAndroidNativeVideoWrapper::getFramesAtIndex(int index, int len) {
-    JNIEnv *env = getJNIEnv();
-    std::vector<std::shared_ptr<SKNativeFrameWrapper>> ret = std::vector<std::shared_ptr<SKNativeFrameWrapper>>();
-    // According to https://stackoverflow.com/a/2093300/4469172, I should not reuse jclass, but `jmethodID`s are
-    // reusable.
-    jobject listObj = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFramesAtIndexMethod, index, len);
-    std::vector<jobject> bitmaps = javaList2vector_jobjects(env, listObj);
-    for(jobject bitmap : bitmaps) {
-        ret.push_back(std::make_shared<SKAndroidNativeFrameWrapper>(jvm, bitmap));
+SKAndroidNativeVideoWrapper::getFramesAtIndex(int index, int length) {
+  std::vector<std::shared_ptr<SKNativeFrameWrapper>> result;
+  const int frameCount = numFrames();
+  if (!valid_ || index < 0 || index >= frameCount || length <= 0) {
+    return result;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return result;
+  }
+  JNIEnv *env = environment.get();
+  jobject list = env->CallObjectMethod(
+      javaVideoWrapper_, getFramesAtIndexMethod, index, length);
+  if (clearPendingException(env) || list == nullptr) {
+    return result;
+  }
+
+  const jint count = env->CallIntMethod(list, listSizeMethod);
+  result.reserve(count);
+  for (jint item = 0; item < count; ++item) {
+    jobject javaFrame = env->CallObjectMethod(list, listGetMethod, item);
+    if (!clearPendingException(env) && javaFrame != nullptr) {
+      const int frameIndex = index + item;
+      auto frame = std::make_shared<SKAndroidNativeFrameWrapper>(
+          moduleState_->jvm,
+          env,
+          javaFrame,
+          frameIndex,
+          frameTimestampAtIndex(frameIndex));
+      if (frame->isValid()) {
+        result.push_back(std::move(frame));
+      }
     }
-    clearJNIEnv();
-    return ret;
-};
+    if (javaFrame != nullptr) {
+      env->DeleteLocalRef(javaFrame);
+    }
+  }
+  env->DeleteLocalRef(list);
+  return result;
+}
+
 std::shared_ptr<SKNativeFrameWrapper>
 SKAndroidNativeVideoWrapper::getFrameAtTime(double time) {
-    JNIEnv *env = getJNIEnv();
-    jobject bitmap = env->CallObjectMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameAtTimeMethod, time);
-    clearJNIEnv();
-    return std::make_shared<SKAndroidNativeFrameWrapper>(jvm, bitmap);
-};
- int SKAndroidNativeVideoWrapper::numFrames() {
-     JNIEnv *env = getJNIEnv();
-     int res = env->CallIntMethod(javaVideoWrapper, NativeVideoWrapperJavaGetNumFramesMethod);
-     clearJNIEnv();
-     return res;
- };
-
- double SKAndroidNativeVideoWrapper::frameRate() {
-     JNIEnv *env = getJNIEnv();
-     double ret = env->CallDoubleMethod(javaVideoWrapper, NativeVideoWrapperJavaGetFrameRateMethod);
-     clearJNIEnv();
-     return ret;
- };
-
- SKRNSize SKAndroidNativeVideoWrapper::size() {
-     JNIEnv *env = getJNIEnv();
-     int width = env->CallIntMethod(javaVideoWrapper, NativeVideoWrapperJavaGetWidthMethod);
-     int height = env->CallIntMethod(javaVideoWrapper, NativeVideoWrapperJavaGetHeightMethod);
-     clearJNIEnv();
-     return (SKRNSize) {.width=(double)width, .height=(double)height};
- }
-
- double SKAndroidNativeVideoWrapper::duration() {
-     JNIEnv *env = getJNIEnv();
-     double ret = env->CallDoubleMethod(javaVideoWrapper, NativeVideoWrapperJavaGetDurationMethod);
-     clearJNIEnv();
-     return ret;
- }
-
-
-void SKAndroidNativeVideoWrapper::initListHelper(JNIEnv *env) {
+  const int frameIndex = frameIndexAtTime(time);
+  if (frameIndex < 0) {
+    return nullptr;
+  }
+  // Decode the frame selected by the same PTS/index mapping exposed to JS so
+  // the returned frame's index and timestamp cannot disagree with its pixels.
+  return getFrameAtIndex(frameIndex);
 }
 
-// Adapted from https://stackoverflow.com/a/33408920/4469172
-std::vector<jobject> SKAndroidNativeVideoWrapper::javaList2vector_jobjects(JNIEnv *env, jobject arrayList) {
-    jint len = env->CallIntMethod(arrayList, java_util_List_size);
-    std::vector<jobject> result;
-    result.reserve(len);
-    for (jint i=0; i<len; i++) {
-        jobject element = static_cast<jobject>(env->CallObjectMethod(arrayList, java_util_List_get, i));
-        result.push_back(element);
+int SKAndroidNativeVideoWrapper::numFrames() const {
+  if (!valid_) {
+    return 0;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return 0;
+  }
+  JNIEnv *env = environment.get();
+  const jint value = env->CallIntMethod(javaVideoWrapper_, getNumFramesMethod);
+  return clearPendingException(env) ? 0 : value;
+}
+
+double SKAndroidNativeVideoWrapper::frameRate() const {
+  if (!valid_) {
+    return 0;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return 0;
+  }
+  JNIEnv *env = environment.get();
+  const jdouble value =
+      env->CallDoubleMethod(javaVideoWrapper_, getFrameRateMethod);
+  return clearPendingException(env) ? 0 : value;
+}
+
+SKRNSize SKAndroidNativeVideoWrapper::size() const {
+  if (!valid_) {
+    return {0, 0};
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return {0, 0};
+  }
+  JNIEnv *env = environment.get();
+  const jint width = env->CallIntMethod(javaVideoWrapper_, getWidthMethod);
+  const jint height = env->CallIntMethod(javaVideoWrapper_, getHeightMethod);
+  return clearPendingException(env)
+      ? SKRNSize{0, 0}
+      : SKRNSize{static_cast<double>(width), static_cast<double>(height)};
+}
+
+double SKAndroidNativeVideoWrapper::duration() const {
+  if (!valid_) {
+    return 0;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return 0;
+  }
+  JNIEnv *env = environment.get();
+  const jdouble value =
+      env->CallDoubleMethod(javaVideoWrapper_, getDurationMethod);
+  return clearPendingException(env) ? 0 : value;
+}
+
+double SKAndroidNativeVideoWrapper::frameTimestampAtIndex(int index) const {
+  if (!valid_ || index < 0) {
+    return 0;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return 0;
+  }
+  JNIEnv *env = environment.get();
+  const jdouble value = env->CallDoubleMethod(
+      javaVideoWrapper_, getFrameTimestampAtIndexMethod, index);
+  return clearPendingException(env) ? 0 : value;
+}
+
+int SKAndroidNativeVideoWrapper::frameIndexAtTime(double time) const {
+  if (!valid_ || time < 0) {
+    return -1;
+  }
+  JniEnvironment environment(moduleState_->jvm);
+  if (!environment) {
+    return -1;
+  }
+  JNIEnv *env = environment.get();
+  const jint value = env->CallIntMethod(
+      javaVideoWrapper_, getFrameIndexAtTimeMethod, time);
+  return clearPendingException(env) ? -1 : value;
+}
+
+SKAndroidNativeFrameWrapper::SKAndroidNativeFrameWrapper(
+    JavaVM *jvm,
+    JNIEnv *env,
+    jobject javaFrame,
+    int frameIndex,
+    double frameTimestamp)
+    : SKNativeFrameWrapper(frameIndex, frameTimestamp), jvm_(jvm) {
+  if (javaFrame == nullptr) {
+    return;
+  }
+
+  javaFrame_ = env->NewGlobalRef(javaFrame);
+  if (javaFrame_ == nullptr) {
+    return;
+  }
+
+  if (hardwareBufferFromJava != nullptr &&
+      hardwareBufferAcquire != nullptr &&
+      frameGetHardwareBufferMethod != nullptr) {
+    jobject javaHardwareBuffer =
+        env->CallObjectMethod(javaFrame_, frameGetHardwareBufferMethod);
+    if (!clearPendingException(env) && javaHardwareBuffer != nullptr) {
+      AHardwareBuffer *buffer =
+          hardwareBufferFromJava(env, javaHardwareBuffer);
+      if (buffer != nullptr) {
+        hardwareBufferAcquire(buffer);
+        hardwareBuffer_ = buffer;
+      }
+      env->DeleteLocalRef(javaHardwareBuffer);
     }
-    return result;
+  }
+
+
+  setValid(true);
 }
 
-
-
-
-#pragma mark - FrameWrapper methods
-
-SKAndroidNativeFrameWrapper::SKAndroidNativeFrameWrapper(JavaVM *_vm, jobject _bitmap) :
-SKNativeFrameWrapper(), jvm(_vm)
-{
-     JNIEnv *env = getJNIEnv();
-    if(_bitmap == NULL) {
-        setValid(false);
-        clearJNIEnv();
-        return;
-    }
-
-    bitmap = env->NewGlobalRef(_bitmap);
-
-    setValid(true);
-    // TODO: DO MORE
-    clearJNIEnv();
-}
 SKAndroidNativeFrameWrapper::~SKAndroidNativeFrameWrapper() {
-     close();
+  close();
+}
+
+std::string SKAndroidNativeFrameWrapper::nativeBufferType() const {
+  std::lock_guard<std::mutex> lock(frameMutex_);
+  return hardwareBuffer_ != nullptr ? "hardwareBuffer" : "bitmap";
 }
 
 void SKAndroidNativeFrameWrapper::close() {
-    if(bitmap != nullptr) {
-        JNIEnv *env = getJNIEnv();
-        setValid(false);
-        env->DeleteGlobalRef(bitmap);
-        bitmap = nullptr;
-        clearJNIEnv();
+  std::lock_guard<std::mutex> lock(frameMutex_);
+  if (!valid_ && javaFrame_ == nullptr && hardwareBuffer_ == nullptr) {
+    return;
+  }
+
+  if (hardwareBuffer_ != nullptr && hardwareBufferRelease != nullptr) {
+    hardwareBufferRelease(hardwareBuffer_);
+    hardwareBuffer_ = nullptr;
+  }
+
+  if (javaFrame_ != nullptr && jvm_ != nullptr) {
+    JniEnvironment environment(jvm_);
+    if (environment) {
+      JNIEnv *env = environment.get();
+      if (frameCloseMethod != nullptr) {
+        env->CallVoidMethod(javaFrame_, frameCloseMethod);
+        clearPendingException(env);
+      }
+      env->DeleteGlobalRef(javaFrame_);
     }
+    javaFrame_ = nullptr;
+  }
+  setValid(false);
 }
 
-SKRNSize SKAndroidNativeFrameWrapper::size() {
-    JNIEnv *env = getJNIEnv();
-    int width = env->CallIntMethod(bitmap, BitmapGetWidthMethod);
-    int height = env->CallIntMethod(bitmap, BitmapGetHeightMethod);
-//    env->CallDoubleMethod(bitmap, bitmapclass, "" )
-    clearJNIEnv();
-    return (SKRNSize){(double)width, (double)height};
+jobject SKAndroidNativeFrameWrapper::bitmap(JNIEnv *env) const {
+  std::lock_guard<std::mutex> lock(frameMutex_);
+  if (!valid_ || javaFrame_ == nullptr || frameGetBitmapMethod == nullptr) {
+    return nullptr;
+  }
+  jobject result = env->CallObjectMethod(javaFrame_, frameGetBitmapMethod);
+  if (clearPendingException(env)) {
+    return nullptr;
+  }
+  return result;
 }
 
-std::string SKAndroidNativeFrameWrapper::base64(std::string format) {
-    JNIEnv *env = getJNIEnv();
-//    jclass SKNativeVideoCLS = env->FindClass("com/reactnativenativevideo/SKNativeVideoWrapperJavaSide");
-//    jmethodID strForBitmap = env->GetStaticMethodID(SKNativeVideoCLS, "Base64StringForBitmap", "(Landroid/graphics/Bitmap;Ljava/lang/String;)Ljava/lang/String;");
-    // Call the Java side to do the conversion.
-    jstring retStr = (jstring)env->CallStaticObjectMethod(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideBase64ForBitmapMethod, bitmap, env->NewStringUTF(format.c_str()));
-    return std::string(env->GetStringUTFChars(retStr, 0));
+SKRNSize SKAndroidNativeFrameWrapper::size() const {
+  std::lock_guard<std::mutex> lock(frameMutex_);
+  if (!valid_ || javaFrame_ == nullptr) {
+    return {0, 0};
+  }
+  JniEnvironment environment(jvm_);
+  if (!environment) {
+    return {0, 0};
+  }
+  JNIEnv *env = environment.get();
+  const jint width = env->CallIntMethod(javaFrame_, frameGetWidthMethod);
+  const jint height = env->CallIntMethod(javaFrame_, frameGetHeightMethod);
+  if (clearPendingException(env)) {
+    return {0, 0};
+  }
+  return {
+      static_cast<double>(width), static_cast<double>(height)};
 }
 
-facebook::jsi::Value SKAndroidNativeFrameWrapper::arrayBufferValue(facebook::jsi::Runtime &runtime) {
-     using namespace facebook;
-     JNIEnv *env = getJNIEnv();
-    jbyteArray arr = (jbyteArray)env->CallStaticObjectMethod(NativeVideoWrapperJavaSideClass, NativeVideoWrapperJavaSideRGBABytesForBitmapMethod, bitmap);
-    int len = env->GetArrayLength(arr);
-    unsigned char *bytes = jbyteArray_createUnsignedCharArray(env, arr);
-    jsi::Function arrayBufferCtor = runtime.global().getPropertyAsFunction(runtime, "ArrayBuffer");
-    size_t totalBytes = len;
-    jsi::Object o = arrayBufferCtor.callAsConstructor(runtime, jsi::Value((int)totalBytes)).getObject(runtime);
-    jsi::ArrayBuffer buf = o.getArrayBuffer(runtime);
-    memcpy(buf.data(runtime), bytes, totalBytes);
-    free(bytes);
-    return std::move(o);
- }
+size_t SKAndroidNativeFrameWrapper::bytesPerRow() const {
+  return static_cast<size_t>(size().width) * 4;
+}
 
+std::string SKAndroidNativeFrameWrapper::base64(const std::string &format) {
+  JniEnvironment environment(jvm_);
+  if (!environment) {
+    return {};
+  }
+  JNIEnv *env = environment.get();
+  jobject frameBitmap = bitmap(env);
+  if (frameBitmap == nullptr) {
+    return {};
+  }
+  jstring javaFormat = env->NewStringUTF(format.c_str());
+  jstring encoded = static_cast<jstring>(env->CallStaticObjectMethod(
+      videoWrapperClass,
+      base64ForBitmapMethod,
+      frameBitmap,
+      javaFormat));
+  env->DeleteLocalRef(javaFormat);
+  env->DeleteLocalRef(frameBitmap);
+  if (clearPendingException(env) || encoded == nullptr) {
+    return {};
+  }
+  std::string result = stringFromJString(env, encoded);
+  env->DeleteLocalRef(encoded);
+  return result;
+}
 
+jsi::Value SKAndroidNativeFrameWrapper::arrayBufferValue(
+    jsi::Runtime &runtime) {
+  JniEnvironment environment(jvm_);
+  if (!environment) {
+    throw jsi::JSError(runtime, "Unable to attach to the Android runtime");
+  }
+  JNIEnv *env = environment.get();
+  jobject frameBitmap = bitmap(env);
+  if (frameBitmap == nullptr) {
+    throw jsi::JSError(runtime, "Unable to rasterize Android frame");
+  }
 
-extern "C"
-JNIEXPORT jobject JNICALL
-Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_getBitmapFromStringAddressOfFrameWrapper(
-        JNIEnv *env, jclass clazz, jstring address) {
-     std::string addrString = jstring2string(env, address);
-    SKAndroidNativeFrameWrapper *wrapper = (SKAndroidNativeFrameWrapper *)StringToPointer(addrString);
-    if(wrapper == NULL) {
-        return nullptr;
+  AndroidBitmapInfo info{};
+  if (AndroidBitmap_getInfo(env, frameBitmap, &info) !=
+          ANDROID_BITMAP_RESULT_SUCCESS ||
+      info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) {
+    env->DeleteLocalRef(frameBitmap);
+    throw jsi::JSError(runtime, "Android frame is not an RGBA8 bitmap");
+  }
+
+  const size_t rowBytes = static_cast<size_t>(info.width) * 4;
+  const size_t totalBytes = rowBytes * info.height;
+  jsi::Function constructor =
+      runtime.global().getPropertyAsFunction(runtime, "ArrayBuffer");
+  jsi::Object object = constructor
+                           .callAsConstructor(
+                               runtime,
+                               jsi::Value(static_cast<double>(totalBytes)))
+                           .getObject(runtime);
+  uint8_t *destination = object.getArrayBuffer(runtime).data(runtime);
+
+  void *pixels = nullptr;
+  if (AndroidBitmap_lockPixels(env, frameBitmap, &pixels) !=
+          ANDROID_BITMAP_RESULT_SUCCESS ||
+      pixels == nullptr) {
+    env->DeleteLocalRef(frameBitmap);
+    throw jsi::JSError(runtime, "Unable to lock Android frame pixels");
+  }
+  const auto *source = static_cast<const uint8_t *>(pixels);
+  for (uint32_t row = 0; row < info.height; ++row) {
+    memcpy(destination + row * rowBytes, source + row * info.stride, rowBytes);
+  }
+  AndroidBitmap_unlockPixels(env, frameBitmap);
+  env->DeleteLocalRef(frameBitmap);
+  return object;
+}
+
+} // namespace SKRNNativeVideo
+
+struct AndroidFrameHolder {
+  jobject bitmap = nullptr;
+};
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_acquireNativeFrame(
+    JNIEnv *env,
+    jclass,
+    jstring nativeId) {
+  auto frame = std::dynamic_pointer_cast<
+      SKRNNativeVideo::SKAndroidNativeFrameWrapper>(
+      SKRNNativeVideo::resolveNativeFrame(
+          SKRNNativeVideo::stringFromJString(env, nativeId)));
+  if (!frame || !frame->isValid()) {
+    return 0;
+  }
+  jobject localBitmap = frame->bitmap(env);
+  if (localBitmap == nullptr) {
+    return 0;
+  }
+  jobject globalBitmap = env->NewGlobalRef(localBitmap);
+  env->DeleteLocalRef(localBitmap);
+  if (globalBitmap == nullptr) {
+    return 0;
+  }
+  return reinterpret_cast<jlong>(new AndroidFrameHolder{globalBitmap});
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_bitmapForNativeFrame(
+    JNIEnv *env,
+    jclass,
+    jlong nativeFrame) {
+  const auto *holder = reinterpret_cast<AndroidFrameHolder *>(nativeFrame);
+  return holder == nullptr || holder->bitmap == nullptr
+      ? nullptr
+      : env->NewLocalRef(holder->bitmap);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_reactnativenativevideo_SKRNNativeFrameViewManager_releaseNativeFrame(
+    JNIEnv *env,
+    jclass,
+    jlong nativeFrame) {
+  auto *holder = reinterpret_cast<AndroidFrameHolder *>(nativeFrame);
+  if (holder != nullptr) {
+    if (holder->bitmap != nullptr) {
+      env->DeleteGlobalRef(holder->bitmap);
     }
-    return wrapper->bitmap;
-}
-
-
-static std::string jstring2string(JNIEnv *env, jstring jStr) {
-    if (!jStr)
-        return "";
-
-    const jclass stringClass = env->GetObjectClass(jStr);
-    const jmethodID getBytes = env->GetMethodID(stringClass, "getBytes", "(Ljava/lang/String;)[B");
-    const jbyteArray stringJbytes = (jbyteArray) env->CallObjectMethod(jStr, getBytes, env->NewStringUTF("UTF-8"));
-
-    size_t length = (size_t) env->GetArrayLength(stringJbytes);
-    jbyte* pBytes = env->GetByteArrayElements(stringJbytes, NULL);
-
-    std::string ret = std::string((char *)pBytes, length);
-    env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
-
-    env->DeleteLocalRef(stringJbytes);
-    env->DeleteLocalRef(stringClass);
-    return ret;
+    delete holder;
+  }
 }

@@ -6,19 +6,30 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
-    "start": "react-native start"
+    "start": "react-native start",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@react-native-community/slider": "4.1.12",
-    "expo": "^44.0.3",
-    "expo-image-picker": "^12.0.1",
-    "react": "~17",
-    "react-native": "0.64.3"
+    "@react-native-community/slider": "4.5.2",
+    "react": "18.2.0",
+    "react-native": "0.73.6",
+    "react-native-document-picker": "9.3.1",
+    "react-native-native-video": "workspace:*"
   },
   "devDependencies": {
-    "@babel/core": "^7.12.10",
-    "@babel/runtime": "^7.12.5",
-    "babel-plugin-module-resolver": "^4.0.0",
-    "metro-react-native-babel-preset": "^0.64.0"
+    "@babel/core": "^7.20.0",
+    "@babel/preset-env": "^7.20.0",
+    "@babel/runtime": "^7.20.0",
+    "@react-native/babel-preset": "0.73.21",
+    "@react-native/codegen": "0.73.3",
+    "@react-native/gradle-plugin": "0.73.4",
+    "@react-native/metro-config": "0.73.5",
+    "@react-native/typescript-config": "0.73.1",
+    "@types/jest": "^29.5.5",
+    "@types/react": "^18.2.6",
+    "typescript": "5.0.4"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

@@ -1,88 +1,133 @@
 #ifndef REACT_NATIVE_NATIVE_VIDEO_COMMON_HEADER_FILE
 #define REACT_NATIVE_NATIVE_VIDEO_COMMON_HEADER_FILE
+
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
+#include <vector>
+
 #include <jsi/jsi.h>
 
-namespace facebook {
-namespace jsi {
-class Runtime;
-}
-namespace react {
-class CallInvoker;
-}
-}
-
 namespace SKRNNativeVideo {
-std::string PointerToString(void* cb);
-void *StringToPointer(std::string& str);
+
+struct SKRNSize {
+  double width;
+  double height;
+};
 
 class SKNativeVideoWrapper;
-typedef struct SKRNSize {
-    double width;
-    double height;
-} SKRNSize;
-facebook::jsi::Object ObjectFromSKRNSize(facebook::jsi::Runtime &runtime, SKRNSize size);
-template <typename JSICompatibleType>
-facebook::jsi::Array ArrayFromJSICompatibleVector(facebook::jsi::Runtime &runtime, std::vector<JSICompatibleType> vec) {
-    facebook::jsi::Array arr(runtime, vec.size());
-    for(int i = 0; i < vec.size(); i++) {
-        arr.setValueAtIndex(runtime, i, facebook::jsi::Object::createFromHostObject(runtime, vec[i]));
-    }
-    return arr;
+class SKNativeFrameWrapper;
+
+using VideoConstructor = std::function<std::shared_ptr<SKNativeVideoWrapper>(
+    facebook::jsi::Runtime &,
+    const std::string &)>;
+
+facebook::jsi::Object ObjectFromSKRNSize(
+    facebook::jsi::Runtime &runtime,
+    SKRNSize size);
+
+template <typename HostObjectType>
+facebook::jsi::Array ArrayFromHostObjects(
+    facebook::jsi::Runtime &runtime,
+    const std::vector<std::shared_ptr<HostObjectType>> &values) {
+  facebook::jsi::Array array(runtime, values.size());
+  for (size_t index = 0; index < values.size(); ++index) {
+    array.setValueAtIndex(
+        runtime,
+        index,
+        facebook::jsi::Object::createFromHostObject(runtime, values[index]));
+  }
+  return array;
 }
 
-int multiply(float a, float b);
+/** Installs the synchronous HostObject factory into the supplied RN runtime. */
+void install(facebook::jsi::Runtime &runtime, VideoConstructor videoConstructor);
 
-void install(facebook::jsi::Runtime &jsiRuntime, std::function<std::shared_ptr<SKNativeVideoWrapper>(facebook::jsi::Runtime&, std::string)> videoConstructor);
-//void install(facebook::jsi::Runtime &jsiRuntime, std::shared_ptr<facebook::react::CallInvoker> invoker);
-void cleanup(facebook::jsi::Runtime &jsiRuntime);
+/**
+ * Resolves the opaque identifier exposed by NativeFrameWrapper. Native preview
+ * views use this registry so they retain a shared_ptr instead of dereferencing
+ * a serialized raw pointer after the HostObject has been collected.
+ */
+std::shared_ptr<SKNativeFrameWrapper> resolveNativeFrame(
+    const std::string &nativeId);
 
-// Override this class in each platform's implementation
-class SKNativeFrameWrapper : public facebook::jsi::HostObject {
-protected:
-    bool _valid = false;
-    // Be sure to set this to true in subclasses when video is loaded
-    void setValid(bool v) {_valid = v;};
-public:
-    bool isValid() { return _valid; };
-    facebook::jsi::Value get(facebook::jsi::Runtime &runtime, const facebook::jsi::PropNameID &name);
-    std::vector<facebook::jsi::PropNameID> getPropertyNames(facebook::jsi::Runtime& rt);
-    SKNativeFrameWrapper() {};
-    
-    // Make sure to implement these methods!
-    /** This is potentially for casting the correct type  (should return "iOS" for iOS and "Android" for Android)*/
-    virtual std::string platform() { return "null"; };
-    // This should free/close native resources
-    virtual void close() {};
-    // Supposed to return ArrayBuffer
-    // TODO: Make it so we're able to specify formats! (currently only RGBA32 (8 bytes per channel))
-    virtual facebook::jsi::Value arrayBufferValue(facebook::jsi::Runtime &runtime) { return facebook::jsi::Value::undefined(); }
-    virtual SKRNSize size() {return (SKRNSize){0, 0};}
-    virtual std::string base64(std::string format = "") {return std::string();}
-    virtual std::string md5() {return std::string();}
+class SKNativeFrameWrapper
+    : public facebook::jsi::HostObject,
+      public std::enable_shared_from_this<SKNativeFrameWrapper> {
+ protected:
+  bool valid_ = false;
+  void setValid(bool value) { valid_ = value; }
+
+ public:
+  explicit SKNativeFrameWrapper(int index = -1, double timestamp = 0);
+  ~SKNativeFrameWrapper() override;
+
+  bool isValid() const { return valid_; }
+  int index() const { return index_; }
+  double timestamp() const { return timestamp_; }
+  const std::string &nativeId() const { return nativeId_; }
+
+  facebook::jsi::Value get(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::PropNameID &name) override;
+  std::vector<facebook::jsi::PropNameID> getPropertyNames(
+      facebook::jsi::Runtime &runtime) override;
+
+  virtual std::string platform() const { return "unknown"; }
+  virtual std::string nativeBufferType() const { return "unknown"; }
+  virtual void close() {}
+  virtual facebook::jsi::Value arrayBufferValue(
+      facebook::jsi::Runtime &) {
+    return facebook::jsi::Value::undefined();
+  }
+  virtual SKRNSize size() const { return {0, 0}; }
+  virtual size_t bytesPerRow() const {
+    return static_cast<size_t>(size().width) * 4;
+  }
+  virtual std::string base64(const std::string &) { return {}; }
+  virtual std::string md5() { return {}; }
+
+ private:
+  const int index_;
+  const double timestamp_;
+  const std::string nativeId_;
 };
 
-class SKNativeVideoWrapper : public facebook::jsi::HostObject {
-protected:
-    bool _valid = false;
-    // Be sure to set this to true in subclasses when video is loaded
-    void setValid(bool v) {_valid = v;};
-public:
-    std::string sourceUri;
-    SKNativeVideoWrapper(std::string sourceUri);
-    facebook::jsi::Value get(facebook::jsi::Runtime &runtime, const facebook::jsi::PropNameID &name);
-    std::vector<facebook::jsi::PropNameID> getPropertyNames(facebook::jsi::Runtime& rt);
-    
-    // Make sure to implement these methods!
-    virtual void close() {};
-    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index) {return std::make_shared<SKNativeFrameWrapper>(); };
-    virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(int index, int numFrames) {return std::vector<std::shared_ptr<SKNativeFrameWrapper>>{};};
-    virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time) {return std::make_shared<SKNativeFrameWrapper>();};
-    virtual int numFrames() {return 0;};
-    virtual double frameRate() {return 0; };
-    virtual SKRNSize size() {return (SKRNSize){0, 0};}
-    virtual double duration() {return 0;}
-};
-}
+class SKNativeVideoWrapper
+    : public facebook::jsi::HostObject,
+      public std::enable_shared_from_this<SKNativeVideoWrapper> {
+ protected:
+  bool valid_ = false;
+  void setValid(bool value) { valid_ = value; }
 
-#endif /* REACT_NATIVE_NATIVE_VIDEO_COMMON_HEADER_FILE */
+ public:
+  explicit SKNativeVideoWrapper(std::string sourceUri);
+  ~SKNativeVideoWrapper() override = default;
+
+  const std::string sourceUri;
+  bool isValid() const { return valid_; }
+
+  facebook::jsi::Value get(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::PropNameID &name) override;
+  std::vector<facebook::jsi::PropNameID> getPropertyNames(
+      facebook::jsi::Runtime &runtime) override;
+
+  virtual void close() {}
+  virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtIndex(int index) = 0;
+  virtual std::vector<std::shared_ptr<SKNativeFrameWrapper>> getFramesAtIndex(
+      int index,
+      int numFrames) = 0;
+  virtual std::shared_ptr<SKNativeFrameWrapper> getFrameAtTime(double time) = 0;
+  virtual int numFrames() const = 0;
+  virtual double frameRate() const = 0;
+  virtual SKRNSize size() const = 0;
+  virtual double duration() const = 0;
+  virtual double frameTimestampAtIndex(int index) const = 0;
+  virtual int frameIndexAtTime(double time) const = 0;
+};
+
+} // namespace SKRNNativeVideo
+
+#endif
