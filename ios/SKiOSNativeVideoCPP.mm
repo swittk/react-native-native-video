@@ -413,6 +413,30 @@ SKiOSNativeFrameWrapper::~SKiOSNativeFrameWrapper() {
   close();
 }
 
+void *SKiOSNativeFrameWrapper::nativeBufferPointer() const {
+  if (!valid_ || buffer == nullptr || !CMSampleBufferIsValid(buffer)) {
+    return nullptr;
+  }
+  return static_cast<void *>(CMSampleBufferGetImageBuffer(buffer));
+}
+
+void *SKiOSNativeFrameWrapper::retainNativeBufferPointer() const {
+  auto *pixelBuffer =
+      static_cast<CVPixelBufferRef>(nativeBufferPointer());
+  if (pixelBuffer == nullptr) {
+    return nullptr;
+  }
+  CVPixelBufferRetain(pixelBuffer);
+  return static_cast<void *>(pixelBuffer);
+}
+
+void SKiOSNativeFrameWrapper::releaseNativeBufferPointer(
+    void *bufferPointer) const {
+  if (bufferPointer != nullptr) {
+    CVPixelBufferRelease(static_cast<CVPixelBufferRef>(bufferPointer));
+  }
+}
+
 jsi::Value SKiOSNativeFrameWrapper::arrayBufferValue(jsi::Runtime &runtime) {
   const UInt32MallocatedPointerStruct raw =
       RawRGBA32DataFromCMSampleBufferAndOrientation(buffer, orientation);

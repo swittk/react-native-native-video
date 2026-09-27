@@ -370,6 +370,7 @@ final class SKNativeVideoWrapperJavaSide {
     private final ImageReader imageReader;
     private final HandlerThread imageThread;
     private final ArrayBlockingQueue<Image> images = new ArrayBlockingQueue<>(16);
+    private boolean hasDecoded;
     private boolean closed;
 
     HardwareFrameDecoder(ReactApplicationContext context, String sourceUri, Uri uri) throws IOException {
@@ -419,7 +420,11 @@ final class SKNativeVideoWrapperJavaSide {
       if (closed) return null;
       drainImages();
       extractor.seekTo(targetUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-      codec.flush();
+      if (hasDecoded) {
+        codec.flush();
+      } else {
+        hasDecoded = true;
+      }
       drainImages();
 
       MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();

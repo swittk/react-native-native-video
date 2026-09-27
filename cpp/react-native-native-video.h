@@ -76,6 +76,14 @@ class SKNativeFrameWrapper
 
   virtual std::string platform() const { return "unknown"; }
   virtual std::string nativeBufferType() const { return "unknown"; }
+  /**
+   * Returns the platform-native decoded buffer while this frame is alive.
+   * iOS: CVPixelBufferRef. Android fast path: AHardwareBuffer*.
+   * The pointer is borrowed; callers must hold a NativeBuffer lease.
+   */
+  virtual void *nativeBufferPointer() const { return nullptr; }
+  virtual void *retainNativeBufferPointer() const { return nullptr; }
+  virtual void releaseNativeBufferPointer(void *) const {}
   virtual void close() {}
   virtual facebook::jsi::Value arrayBufferValue(
       facebook::jsi::Runtime &) {
@@ -127,6 +135,30 @@ class SKNativeVideoWrapper
   virtual double frameTimestampAtIndex(int index) const = 0;
   virtual int frameIndexAtTime(double time) const = 0;
 };
+
+
+
+#if defined(__GNUC__)
+#define SKRNNATIVEVIDEO_BRIDGE_EXPORT __attribute__((visibility("default")))
+#else
+#define SKRNNATIVEVIDEO_BRIDGE_EXPORT
+#endif
+
+/**
+ * Stable C ABI for companion native adapters. A lease retains both the
+ * NativeFrame HostObject and an independent platform-native buffer reference.
+ *
+ * The returned native-buffer pointer is owned by the lease and remains valid
+ * even if the source NativeFrame is closed before the lease is released.
+ */
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
+SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void *
+SKRNNativeVideoNativeBufferLeaseGetPointer(void *lease);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT const char *
+SKRNNativeVideoNativeBufferLeaseGetType(void *lease);
+extern "C" SKRNNATIVEVIDEO_BRIDGE_EXPORT void
+SKRNNativeVideoReleaseNativeBufferLease(void *lease);
 
 } // namespace SKRNNativeVideo
 

@@ -1,6 +1,6 @@
 {
   "name": "react-native-native-video",
-  "version": "0.2.24",
+  "version": "0.2.25",
   "description": "Native Video Access for React Native",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
