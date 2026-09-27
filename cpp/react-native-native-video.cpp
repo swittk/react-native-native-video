@@ -116,6 +116,49 @@ std::shared_ptr<SKNativeFrameWrapper> resolveNativeFrame(
   return frame;
 }
 
+
+struct NativeBufferLease {
+  std::shared_ptr<SKNativeFrameWrapper> frame;
+  void *buffer = nullptr;
+  std::string type;
+};
+
+extern "C" void *SKRNNativeVideoAcquireNativeBufferLease(const char *nativeId) {
+  if (nativeId == nullptr) {
+    return nullptr;
+  }
+  auto frame = resolveNativeFrame(nativeId);
+  if (!frame || !frame->isValid()) {
+    return nullptr;
+  }
+  void *buffer = frame->nativeBufferPointer();
+  if (buffer == nullptr) {
+    return nullptr;
+  }
+  auto *lease = new NativeBufferLease{
+      std::move(frame),
+      buffer,
+      {}};
+  lease->type = lease->frame->nativeBufferType();
+  return lease;
+}
+
+extern "C" void *
+SKRNNativeVideoNativeBufferLeaseGetPointer(void *opaqueLease) {
+  auto *lease = static_cast<NativeBufferLease *>(opaqueLease);
+  return lease == nullptr ? nullptr : lease->buffer;
+}
+
+extern "C" const char *
+SKRNNativeVideoNativeBufferLeaseGetType(void *opaqueLease) {
+  auto *lease = static_cast<NativeBufferLease *>(opaqueLease);
+  return lease == nullptr ? nullptr : lease->type.c_str();
+}
+
+extern "C" void SKRNNativeVideoReleaseNativeBufferLease(void *opaqueLease) {
+  delete static_cast<NativeBufferLease *>(opaqueLease);
+}
+
 jsi::Value SKNativeVideoWrapper::get(
     jsi::Runtime &runtime,
     const jsi::PropNameID &name) {

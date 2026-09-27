@@ -34,6 +34,7 @@ class SKAndroidNativeFrameWrapper final : public SKNativeFrameWrapper {
 
   std::string platform() const override { return "Android"; }
   std::string nativeBufferType() const override;
+  void *nativeBufferPointer() const override;
   void close() override;
   facebook::jsi::Value arrayBufferValue(
       facebook::jsi::Runtime &runtime) override;

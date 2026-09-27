@@ -444,6 +444,11 @@ std::string SKAndroidNativeFrameWrapper::nativeBufferType() const {
   return hardwareBuffer_ != nullptr ? "hardwareBuffer" : "bitmap";
 }
 
+void *SKAndroidNativeFrameWrapper::nativeBufferPointer() const {
+  std::lock_guard<std::mutex> lock(frameMutex_);
+  return valid_ ? static_cast<void *>(hardwareBuffer_) : nullptr;
+}
+
 void SKAndroidNativeFrameWrapper::close() {
   std::lock_guard<std::mutex> lock(frameMutex_);
   if (!valid_ && javaFrame_ == nullptr && hardwareBuffer_ == nullptr) {
