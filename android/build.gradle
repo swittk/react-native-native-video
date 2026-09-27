@@ -76,6 +76,12 @@ apply plugin: "com.android.library"
 def newArchitecture = reactNativeMinor >= 82 ||
     (rootProject.hasProperty("newArchEnabled") &&
         rootProject.getProperty("newArchEnabled") == "true")
+def minNewArchMinor = 75
+if (newArchitecture && reactNativeMinor < minNewArchMinor) {
+  throw new GradleException(
+      "ReactNativeNativeVideo New Architecture support requires React Native 0.${minNewArchMinor}+; " +
+      "found ${reactNativeVersion}. Set newArchEnabled=false for this host.")
+}
 
 apply plugin: "com.facebook.react"
 

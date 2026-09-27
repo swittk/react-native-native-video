@@ -113,8 +113,9 @@ final class SKNativeVideoWrapperJavaSide {
     int length = Math.min(requestedLength, frameCount - index);
     List<SKAndroidNativeFrameJavaSide> result = new ArrayList<>(length);
     for (int offset = 0; offset < length; offset++) {
-      SKAndroidNativeFrameJavaSide frame = getFrameAtIndex(index + offset);
-      if (frame != null) result.add(frame);
+      // Preserve one list slot per requested frame. Native code derives the
+      // frame index/timestamp from the list position and skips null entries.
+      result.add(getFrameAtIndex(index + offset));
     }
     return result;
   }

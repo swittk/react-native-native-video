@@ -109,8 +109,9 @@ std::shared_ptr<SKNativeFrameWrapper> resolveNativeFrame(
     return nullptr;
   }
   auto frame = entry->second.lock();
-  if (!frame) {
+  if (!frame || !frame->isValid()) {
     nativeFrameRegistry.erase(entry);
+    return nullptr;
   }
   return frame;
 }
